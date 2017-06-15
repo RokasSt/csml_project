@@ -25,7 +25,9 @@ class BoltzmannMachine(object):
                  test_inputs, 
                  algorithm,
                  batch_size,
+                 learning_rate,
                  num_samples,
+                 num_steps,
                  W= None, 
                  b= None, 
                  training = True):
@@ -42,7 +44,11 @@ class BoltzmannMachine(object):
         
         self.batch_size  = batch_size
         
+        self.learning_rate = learning_rate
+        
         self.num_samples = num_samples
+        
+        self.num_steps   = num_steps
         
         self.side = int(np.sqrt(self.num_vars))
         
@@ -66,7 +72,9 @@ class BoltzmannMachine(object):
            
            self.updates = OrderedDict()
            
-           num_examples = training_inputs.shape[0]
+           self.num_examples = training_inputs.shape[0]
+           
+           assert self.num_train_examples == 55000
            
            self.train_inputs = theano.shared(np.asarray(training_inputs,
                                           dtype=theano.config.floatX),
@@ -101,7 +109,7 @@ class BoltzmannMachine(object):
            
            self.x_tilda         = T.matrix('x_tilda')
            
-           self.train_set       = set(range(num_examples))
+           self.train_set       = set(range(self.num_train_examples))
         
            self.minibatch_set   = T.ivector('minibatch_set')
         
@@ -147,13 +155,26 @@ class BoltzmannMachine(object):
         importance sampling over the complementary set of training examples
         """
         
-        approx_Z = self.compute_energy(self.x_tilda, self.batch_size*num_samples)
+        if num_samples < self.num_train_examples:
         
-        approx_Z = T.reshape(approx_Z, [self.batch_size,num_samples])
+           approx_Z = self.compute_energy(self.x_tilda, self.batch_size*num_samples)
+           
+           approx_Z = T.reshape(approx_Z, [self.batch_size,num_samples])
         
-        approx_Z = (1.0/num_samples)*T.sum(T.exp(-approx_Z), axis=1)
-        
-        return approx_Z
+           approx_Z = (1.0/num_samples)*T.sum(T.exp(-approx_Z), axis=1)
+           
+           use_all_data = False
+           
+        if num_samples == self.num_train_examples:
+           print("A whole training dataset is used to estimate Z")
+           sys.exit()
+           approx_Z = self.compute_energy(self.x_tilda, num_samples)
+           
+           approx_Z = (1.0/num_samples)*T.sum(T.exp(-approx_Z))
+           
+           use_all_data = True
+           
+        return approx_Z, use_all_data
         
     def compute_energy(self, x, num_terms):
         
@@ -165,7 +186,7 @@ class BoltzmannMachine(object):
         
         return evals
          
-    def add_objective(self, num_samples = None, num_steps = 1):
+    def add_objective(self):
         
         """ function to add the model objective """ 
         
@@ -173,10 +194,16 @@ class BoltzmannMachine(object):
         
         if self.algorithm == "CSS":
             
-           approx_Z = self.add_css_approximation(num_samples)
+           approx_Z, full_dataset = self.add_css_approximation(num_samples)
            
-           normalizer_term = \
-           T.mean(T.log(T.exp(-minibatch_energy_evals) + approx_Z) )
+           if full_dataset:
+               
+              normalizer_term = T.mean(approx_Z)
+              
+            else:
+           
+              normalizer_term = \
+              T.mean(T.log(T.exp(-minibatch_energy_evals) + approx_Z) )
            
         if self.algorithm =="CD1":
            
@@ -186,12 +213,12 @@ class BoltzmannMachine(object):
            
         self.cost = T.mean(minibatch_energy_evals) + normalizer_term
         
-    def add_cd_samples(self, num_steps = 1):
+    def add_cd_samples(self):
         
         """ function to add sampling procedure for CD approximation """ 
         
         (self.p_xi_given_x_, self.gibbs_samples), self.gibbs_updates =\
-        theano.scan(self.gibbs_step_fully_visible, n_steps = num_steps)
+        theano.scan(self.gibbs_step_fully_visible, n_steps = self.num_steps)
         
     def get_cd_samples(self): 
         
@@ -240,14 +267,22 @@ class BoltzmannMachine(object):
         ##  compl_inds :: complementary set of training points
         ##  for now, complementary set is computed jointly;
         ##  uses naive approach, uniform sampling
+        
+        if num_samples < self.num_train_examples:
 
-        compl_inds = list(self.train_set - set(minibatch_set))
+           compl_inds = list(self.train_set - set(minibatch_set))
             
-        samples = np.random.choice(compl_inds, minibatch_size*num_samples, replace=False)
+           samples = np.random.choice(compl_inds,
+                                      minibatch_size*num_samples, 
+                                      replace=False)
         
-        samples = list(samples)
+           samples = list(samples)
         
-        assert len(samples) == num_samples*minibatch_size
+           assert len(samples) == num_samples*minibatch_size
+           
+        if num_samples == self.num_train_examples:
+            
+           samples = list(self.train_set)
         
         return samples  
         
@@ -354,7 +389,7 @@ class BoltzmannMachine(object):
         
         return (get_p, get_samples), updates
         
-    def add_graph(self, learning_rate):
+    def add_graph(self):
         
         """ function to build a Theano computational graph """
         
@@ -368,7 +403,7 @@ class BoltzmannMachine(object):
 
            cd_sampling = self.get_cd_samples()
 
-        self.add_grad_updates(learning_rate)   
+        self.add_grad_updates(self.learning_rate)   
 
         self.add_pseudo_cost_measure()
 

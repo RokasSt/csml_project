@@ -49,7 +49,9 @@ arg_parser.add_argument('--num_epochs', type=str,required= True)
 
 arg_parser.add_argument('--algorithm', type=str,required= True)
 
-arg_parser.add_argument('--num_samples', type = str, required = True)
+arg_parser.add_argument('--num_samples', type = str, required = False)
+
+arg_parser.add_argument('--num_steps', type = str, required = False)
 
 arg_parser.add_argument('--batch_size', type= str, required=  True)
 
@@ -71,16 +73,32 @@ num_samples     = int(FLAGS.num_samples)
 
 experiment_tag  = FLAGS.experiment
 
-dir_name ="logs_%s"%experiment_tag
+dir_name ="logs_%s"%algorithm
 
-specs = (algorithm,
-         str(learning_rate),
-         batch_size, 
-         num_samples, 
-         datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" ))
+if algorithm == "CSS_NAIVE":
+    
+   num_samples = int(FLAGS.num_samples)
 
-exp_tag = "%s_LR%sBS%dNS%d_%s"%specs
-        
+   specs = (str(learning_rate),
+            batch_size, 
+            num_samples, 
+            datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" ))
+
+   exp_tag = "LR%sBS%dNS%d_%s"%specs
+   
+if algorithm == "CD1":
+    
+   num_steps = int(FLAGS.num_steps)
+   
+   specs = (str(learning_rate),
+            batch_size,
+            num_steps,
+            datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" ))
+
+   exp_tag = "LR%sBS%dNS%d_%s"%specs
+   
+   num_samples = None 
+   
 exp_path = os.path.join(dir_name,exp_tag)
         
 os.makedirs(exp_path)
@@ -94,9 +112,11 @@ bm = BoltzmannMachine(num_vars        = input_dim,
                       test_inputs     = test_images,
                       algorithm       = algorithm,
                       batch_size      = batch_size,
-                      num_samples     = num_samples)
+                      learning_rate   = learning_rate,
+                      num_samples     = num_samples,
+                      num_steps       = num_steps)
                       
-cd_sampling, optimize = bm.add_graph(learning_rate)
+cd_sampling, optimize = bm.add_graph()
 
 start_time = timeit.default_timer()
 
