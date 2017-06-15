@@ -156,6 +156,27 @@ if __name__ == "__main__":
     
     print(compute_diag_terms([[1,2],[3,4]], [[1,1,2],[1,1,2]], [[1],[1]]))
     
+    print("new test")
+    
+    def gibbs_update_node(self, target_node):
+        
+        """ Gibbs sampling update for a target node for fully
+        visible Boltzmann Machine
+        """
+        
+        p_xi_given_x_ = self.sigmoid_output(T.transpose(self.x_gibbs),target_node)
+        
+        samples = self.theano_rand_gen.binomial(size = p_xi_given_x_.shape,
+                                                n    = 1, 
+                                                p    = p_xi_given_x_,
+                                                dtype=theano.config.floatX)
+        
+        x_gibbs_update= T.set_subtensor(self.x_gibbs[:, target_node], samples)
+        
+        updates = OrderedDict([(self.x_gibbs, x_gibbs_update)])
+        
+        return (p_xi_given_x_, samples), updates
+    
     
     
     

@@ -24,11 +24,11 @@ from   model_classes import BoltzmannMachine
 
 mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 
-test_images      = mnist.test.images
+test_images      = np.round(mnist.test.images)
 
 test_labels      = mnist.test.labels
 
-train_images     = mnist.train.images
+train_images     = np.round(mnist.train.images)
 
 train_labels     = mnist.train.labels
 
@@ -38,7 +38,7 @@ input_dim        = train_images.shape[1]
 
 assert input_dim == 784
 
-validate_images  = mnist.validation.images
+validate_images  = np.round(mnist.validation.images)
 
 validate_labels  = mnist.validation.labels
 
@@ -69,6 +69,9 @@ save_to_path       = os.path.join(save_to_path,"samples.jpeg")
 bm = BoltzmannMachine(num_vars = input_dim, 
                       training_inputs = train_images,
                       test_inputs     = test_images,
+                      algorithm       = None,
+                      batch_size      = None,
+                      num_samples     = None,
                       training        = False)
                       
 bm.load_model_params(full_path = path_to_params)

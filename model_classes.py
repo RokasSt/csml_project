@@ -24,6 +24,8 @@ class BoltzmannMachine(object):
                  training_inputs, 
                  test_inputs, 
                  algorithm,
+                 batch_size,
+                 num_samples,
                  W= None, 
                  b= None, 
                  training = True):
@@ -36,21 +38,30 @@ class BoltzmannMachine(object):
         
         """
         
-        self.num_vars = num_vars
+        self.num_vars    = num_vars
+        
+        self.batch_size  = batch_size
+        
+        self.num_samples = num_samples
         
         self.side = int(np.sqrt(self.num_vars))
         
         np_rand_gen = np.random.RandomState(1234)
         
-        self.theano_rand_gen = T.shared_randomstreams.RandomStreams(np_rand_gen.randint(2 ** 30))
+        self.theano_rand_gen =\
+         T.shared_randomstreams.RandomStreams(np_rand_gen.randint(2**30))
                                          
         self.algorithm = algorithm
     
         self.num_test_examples = test_inputs.shape[0]
         
-        self.target_node = theano.shared(value=0, name='target_node')
+        theano.config.exception_verbosity = 'high'
+        
+        self.node_indices  = \
+        theano.shared(np.arange(self.num_vars), name="node_indices")
         
         if training:
+            
            print("Training Phase")
            
            self.updates = OrderedDict()
@@ -61,7 +72,6 @@ class BoltzmannMachine(object):
                                           dtype=theano.config.floatX),
                                           borrow= True)
                                           
-           
            if W is None:
         
               uniform_init = np_rand_gen.uniform(-np.sqrt(3.0/num_vars),\
@@ -84,11 +94,11 @@ class BoltzmannMachine(object):
            else:
             
               self.b = b
-        
+           
            self.theta           = [self.W, self.b]
         
            self.x               = T.matrix('x')
-        
+           
            self.x_tilda         = T.matrix('x_tilda')
            
            self.train_set       = set(range(num_examples))
@@ -96,9 +106,11 @@ class BoltzmannMachine(object):
            self.minibatch_set   = T.ivector('minibatch_set')
         
            self.sample_set      = T.ivector('sample_set')
-        
-           self.num_samples     = T.scalar('num_samples')
            
+           self.x_gibbs         = theano.shared(np.zeros([self.batch_size,self.num_vars])) 
+           
+           self.cd_samples      = theano.shared(np.zeros([self.batch_size,self.num_vars]))
+    
         else:
             
            self.test_inputs = theano.shared(np.asarray(test_inputs,
@@ -126,78 +138,74 @@ class BoltzmannMachine(object):
     
         """
   
-        return - T.dot(T.transpose(x), T.dot(self.W, x)) - T.dot(T.transpose(self.b), x)
+        return -T.dot(T.transpose(x), T.dot(self.W, x)) - T.dot(T.transpose(self.b), x)
     
-    def add_css_approximation(self, batch_size, num_samples):
+    def add_css_approximation(self, num_samples):
         
         """ function to compute an approximating part of parition function
         according to Botev et al. 2017. For now uses uniform 
         importance sampling over the complementary set of training examples
         """
         
-        approx_Z = self.compute_energy(self.x_tilda, batch_size*num_samples)
+        approx_Z = self.compute_energy(self.x_tilda, self.batch_size*num_samples)
         
-        approx_Z = T.reshape(approx_Z, [batch_size,num_samples])
+        approx_Z = T.reshape(approx_Z, [self.batch_size,num_samples])
         
         approx_Z = (1.0/num_samples)*T.sum(T.exp(-approx_Z), axis=1)
         
         return approx_Z
         
-    def compute_energy(self, x, batch_size):
+    def compute_energy(self, x, num_terms):
         
         """ function to evaluate energies over a given set of inputs """
         
         evals, _ = \
         theano.scan(lambda i: self.energy_function(T.transpose(x[i,:])), \
-        sequences = [T.arange(batch_size)] )
+        sequences = [T.arange(num_terms)] )
         
         return evals
-    
-    def add_css_objective(self, batch_size, num_samples): 
-        
-        """ adds an approximation to the objective
-        function using complementary sum sampling technique 
-        (Botev et al. 2017)
-        """
-        
-        approx_Z = self.add_css_approximation(batch_size, num_samples)
-        
-        ## use scan to avoid computation of off-diagonal terms:
-        ## grad_updates dictionary is initialized with scan
-        minibatch_energy_evals = self.compute_energy(self.x, batch_size)
-        
-        self.cost = T.mean(minibatch_energy_evals) + \
-         T.mean(T.log(T.exp(-minibatch_energy_evals) +  approx_Z) )
          
-    def add_objective(self, batch_size, num_samples = None, num_steps =1):
+    def add_objective(self, num_samples = None, num_steps = 1):
         
-        """function to add the model objective """
+        """ function to add the model objective """ 
         
-        minibatch_energy_evals = self.compute_energy(self.x, batch_size)
+        minibatch_energy_evals = self.compute_energy(self.x, self.batch_size)
         
         if self.algorithm == "CSS":
             
-           approx_Z = self.add_css_approximation(batch_size, num_samples)
+           approx_Z = self.add_css_approximation(num_samples)
            
            normalizer_term = \
            T.mean(T.log(T.exp(-minibatch_energy_evals) + approx_Z) )
            
         if self.algorithm =="CD1":
-            
-           self.x_gibbs = theano.shared(np.ones([batch_size,self.num_vars]))
            
-           (p_xi_given_x_, x_samples), self.updates =\
-           theano.scan(self.gibbs_step_fully_visible, n_steps = num_steps) 
+           normalizer_term = self.compute_energy(self.cd_samples, self.batch_size)
            
-           cd_samples = x_samples[-1]
+           normalizer_term = -T.mean(normalizer_term)
            
-           cd_samples = theano.gradient.disconnected_grad(cd_samples)
-           
-           normalizer_term = -T.mean(self.compute_energy(cd_samples, 
-                                                         batch_size))
-         
         self.cost = T.mean(minibatch_energy_evals) + normalizer_term
-    
+        
+    def add_cd_samples(self, num_steps = 1):
+        
+        """ function to add sampling procedure for CD approximation """ 
+        
+        (self.p_xi_given_x_, self.gibbs_samples), self.gibbs_updates =\
+        theano.scan(self.gibbs_step_fully_visible, n_steps = num_steps)
+        
+    def get_cd_samples(self): 
+        
+        """ function to obtain samples for CD approxmation """
+        
+        get_samples = theano.function(inputs  = [self.minibatch_set],
+                                      outputs = [self.p_xi_given_x_[-1], 
+                                                 self.gibbs_samples[-1]], 
+                                      givens  = {self.x_gibbs: 
+                                      self.train_inputs[self.minibatch_set,:]},
+                                      updates = self.gibbs_updates)
+                                      
+        return get_samples
+                                    
     def add_grad_updates(self, lrate):
         
         """  compute and collect gradient updates to dictionary
@@ -224,18 +232,14 @@ class BoltzmannMachine(object):
     def select_samples(self, minibatch_set, num_samples):
         
         """ function to select samples for css approximation
-        with uniform importance sampling
+        with uniform sampling
          """
         
         minibatch_size = len(minibatch_set)
         
         ##  compl_inds :: complementary set of training points
         ##  for now, complementary set is computed jointly;
-        ##  alternatively, complementary set can be computed for
-        ##  each individual training point in a minibatch but this
-        ##  adds additional cost while not significantly affecting
-        ##  the approximation procedure under uniform importance
-        ##  sampling (test this !!!)
+        ##  uses naive approach, uniform sampling
 
         compl_inds = list(self.train_set - set(minibatch_set))
             
@@ -247,7 +251,7 @@ class BoltzmannMachine(object):
         
         return samples  
         
-    def add_pseudo_cost_measure(self, batch_size):
+    def add_pseudo_cost_measure(self):
         
         """adds stochastic approximation to the cost objective;
         the functional form is similar to the Gibbs sampling update
@@ -265,9 +269,9 @@ class BoltzmannMachine(object):
         # the result to x_bin_flip_i, instead of working in place on x_bin
         x_bin_flip_i = T.set_subtensor(x_bin[:, node_index], 1- x_bin[:, node_index])
         
-        fe_x_bin  = self.compute_energy(x_bin, batch_size)
+        fe_x_bin  = self.compute_energy(x_bin, self.batch_size)
         
-        fe_x_bin_flip_i = self.compute_energy(x_bin_flip_i, batch_size)
+        fe_x_bin_flip_i = self.compute_energy(x_bin_flip_i, self.batch_size)
         
         #  mean(input dimension * log P ( xi | {x -i} ):
         self.pseudo_cost = T.mean(self.num_vars *\
@@ -275,18 +279,6 @@ class BoltzmannMachine(object):
 
         # increment bit_i_idx % number as part of updates
         self.updates[node_index] = (node_index + 1) % self.num_vars
-        
-    def init_chains(self):
-        
-        """ function to initialize MCMC chains with training examples
-        for the Contrastive Divergence algorithm"""
-        
-        update = (self.x_gibbs, self.train_inputs[self.minibatch_set,:])
-        
-        init_chains = theano.function(inputs= [self.minibatch_set],
-                                      updates = [update])
-                                      
-        return init_chains
         
     def optimization_step(self):
         
@@ -306,62 +298,90 @@ class BoltzmannMachine(object):
         if self.algorithm =="CD1":
             
            input_dict = {
-            self.x         : self.train_inputs[self.minibatch_set,:]} 
+            self.x         : self.train_inputs[self.minibatch_set,:],
+            } 
             
            var_list = [self.minibatch_set]
         
-        opt_step = theano.function(
-        inputs= var_list,
-        outputs=self.pseudo_cost,
-        updates=self.updates,
-        givens = input_dict)
+        opt_step = theano.function(inputs= var_list,
+                                   outputs=self.pseudo_cost,
+                                   updates=self.updates,
+                                   givens = input_dict)
         
         return opt_step
-        
+         
     def sigmoid_output(self, x, var_index):
         
         """ function to compute the sigmoid output for the Gibbs step
         for fully visible Boltzmann Machine 
         
         """
-         
-        sigmoid_activation = self.b[var_index] + 2*T.dot(self.W[var_index,:],x) 
+        
+        sigmoid_activation = self.b[self.node_indices[var_index]] +\
+         2*T.dot(self.W[self.node_indices[var_index],:],x) 
          
         return T.nnet.sigmoid(sigmoid_activation)
         
-    def gibbs_update_node(self):
+    def gibbs_update_node(self, target_node):
         
         """ Gibbs sampling update for a target node for fully
         visible Boltzmann Machine
         """
         
-        p_xi_given_x_ = self.sigmoid_output(T.transpose(self.x_gibbs), self.target_node)
+        p_xi_given_x_ = self.sigmoid_output(T.transpose(self.x_gibbs),target_node)
         
         samples = self.theano_rand_gen.binomial(size = p_xi_given_x_.shape,
                                                 n    = 1, 
                                                 p    = p_xi_given_x_,
                                                 dtype=theano.config.floatX)
         
-        x_gibbs_update= T.set_subtensor(self.x_gibbs[:,self.target_node], samples)
+        x_gibbs_update= T.set_subtensor(self.x_gibbs[:, target_node], samples)
         
-        updates = OrderedDict([(self.x_gibbs, x_gibbs_update),
-                 (self.target_node, (self.target_node +1) % self.num_vars) ])
+        updates = OrderedDict([(self.x_gibbs, x_gibbs_update)])
         
         return (p_xi_given_x_, samples), updates
          
     def gibbs_step_fully_visible(self):
         
         """   
-        Function to inplement a Gibbs step for fully visible
-        Boltzmann Machine. 
+        Function to inplement a Gibbs step for fully
+        visible Boltzmann Machine. 
         """
         
         (get_p, get_samples), updates  =\
-         theano.scan(self.gibbs_update_node, n_steps = self.num_vars)
+         theano.scan(self.gibbs_update_node, 
+                     sequences =[T.arange(self.num_vars)])
         
         return (get_p, get_samples), updates
         
-    def sample_from_bm(self, num_chains, num_samples, num_steps, save_to_path):
+    def add_graph(self, learning_rate):
+        
+        """ function to build a Theano computational graph """
+        
+        cd_sampling = None
+        
+        self.add_objective(self.batch_size, self.num_samples)
+
+        if self.algorithm == "CD1":
+
+           self.add_cd_samples()
+
+           cd_sampling = self.get_cd_samples()
+
+        self.add_grad_updates(learning_rate)   
+
+        self.add_pseudo_cost_measure()
+
+        optimize = self.optimization_step()
+ 
+        return cd_sampling, optimize
+        
+    def sample_from_bm(self, 
+                       num_chains, 
+                       num_samples, 
+                       num_steps, 
+                       save_to_path,
+                       test_mode = True):
         
         """ function to generate images from trained 
         Boltzmann Machine (fully visible).
@@ -383,17 +403,38 @@ class BoltzmannMachine(object):
         
         theano.config.exception_verbosity = 'high'
         
-        test_function = theano.function([],chain_vars)
-        
         self.x_gibbs = chain_vars
+        
+        if test_mode:
+        
+           print(self.x_gibbs.get_value()[:,0])
+           print(self.x_gibbs.get_value()[:,1])
+           print(self.x_gibbs.get_value()[:,self.num_vars-1])
+        
+           (p_xi_given_x_, x_samples), updates =\
+           theano.scan(self.gibbs_step_fully_visible, n_steps = 1) 
+        
+           get_samples = theano.function(inputs  = [],
+                                         outputs = [p_xi_given_x_,x_samples], 
+                                         updates = updates)
+                                      
+           p, samples = get_samples()
+        
+           print("")
+           print(samples[0][0])
+           print(samples[0][1])
+           print(samples[0][self.num_vars -1])
+        
+           print("")
+           print(self.x_gibbs.get_value()[:,0])
+           print(self.x_gibbs.get_value()[:,1])
+           print(self.x_gibbs.get_value()[:,self.num_vars-1])
+           ### testing
+           sys.exit()
         
         (p_xi_given_x_, x_samples), updates =\
         theano.scan(self.gibbs_step_fully_visible, n_steps = num_steps) 
         
-        get_samples = theano.function(inputs  = [],
-                                      outputs = [p_xi_given_x_,x_samples], 
-                                      updates = updates)
-                                      
         get_samples = theano.function(inputs  = [],
                                       outputs = [p_xi_given_x_[-1],x_samples[-1]], 
                                       updates = updates)
@@ -432,11 +473,13 @@ class BoltzmannMachine(object):
         
         print("Saving model parameters to %s"%full_path)
         
-        cPickle.dump(self.theta, file_to_save, protocol=cPickle.HIGHEST_PROTOCOL)
+        cPickle.dump(self.theta, 
+                     file_to_save, 
+                     protocol=cPickle.HIGHEST_PROTOCOL)
         
         file_to_save.close()
-            
-            
+        
+        
             
             
             

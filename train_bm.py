@@ -25,11 +25,11 @@ from   model_classes import BoltzmannMachine
 print("Importing data:")
 mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 
-test_images      = mnist.test.images
+test_images      = np.round(mnist.test.images)
 
 test_labels      = mnist.test.labels
 
-train_images     = mnist.train.images
+train_images     = np.round(mnist.train.images)
 
 train_labels     = mnist.train.labels
 
@@ -39,7 +39,7 @@ input_dim        = train_images.shape[1]
 
 assert input_dim == 784
 
-validate_images  = mnist.validation.images
+validate_images  = np.round(mnist.validation.images)
 
 validate_labels  = mnist.validation.labels
 
@@ -89,22 +89,14 @@ num_iterations = num_train_images // batch_size
 
 losses = []
 
-### add definitions computational graph
-bm = BoltzmannMachine(num_vars = input_dim, 
+bm = BoltzmannMachine(num_vars        = input_dim, 
                       training_inputs = train_images,
                       test_inputs     = test_images,
-                      algorithm       = algorithm)
-
-bm.add_objective(batch_size, num_samples)
-
-bm.add_grad_updates(learning_rate)   
-
-bm.add_pseudo_cost_measure(batch_size)
-
-init_chains = bm.init_chains()
-
-optimize = bm.optimization_step()
-### end adding definitions
+                      algorithm       = algorithm,
+                      batch_size      = batch_size,
+                      num_samples     = num_samples)
+                      
+cd_sampling, optimize = bm.add_graph(learning_rate)
 
 start_time = timeit.default_timer()
 
@@ -121,14 +113,18 @@ for epoch_index in range(num_epochs):
         selected_inds = permuted_inds[batch_size*iter_index:batch_size*(iter_index+1)]
         
         if algorithm =="CSS":
-        
+           
            sampled_indices = bm.select_samples(selected_inds, num_samples)
         
            approx_minibatch_cost = optimize(sampled_indices, list(selected_inds))
            
         if algorithm =="CD1":
+            
+           bm.get_cd_samples()
            
-           init_chains(list(selected_inds))
+           mf_sample, cd_sample = cd_sampling(list(selected_inds))
+           
+           bm.cd_samples.set_value(np.transpose(cd_sample)) 
            
            approx_minibatch_cost = optimize(list(selected_inds))
         
