@@ -9,6 +9,7 @@ Machine Learning
 import numpy as np
 import theano.tensor as T
 import theano
+import sys
 from matplotlib import pyplot as plt
 
 def energy_function(W, b, x):
@@ -128,14 +129,14 @@ if __name__ == "__main__":
     
     print(compute_quad_form([[1,2],[3,4]], [[1],[1]], [[1],[1]])[0][0] == 12)
     
-    grad_W, grad_b = T.grad(T.sum(T.diag(quadratic_form)), [W,b])
+    grad_W, grad_b = T.grad(quadratic_form[0][0], [W,b])
     
     comp_grad_W = theano.function([W,b,x], grad_W)
     
     comp_grad_b = theano.function([W,b,x], grad_b)
     
     print(comp_grad_W([[0,2],[2,0]], [[1],[1]], [[1],[4]]))
-    
+    sys.exit()
     print(comp_grad_b([[0,2],[2,0]], [[1],[1]], [[1],[4]]))
     
     compute_trace = T.diag(W)
@@ -156,26 +157,6 @@ if __name__ == "__main__":
     
     print(compute_diag_terms([[1,2],[3,4]], [[1,1,2],[1,1,2]], [[1],[1]]))
     
-    print("new test")
-    
-    def gibbs_update_node(self, target_node):
-        
-        """ Gibbs sampling update for a target node for fully
-        visible Boltzmann Machine
-        """
-        
-        p_xi_given_x_ = self.sigmoid_output(T.transpose(self.x_gibbs),target_node)
-        
-        samples = self.theano_rand_gen.binomial(size = p_xi_given_x_.shape,
-                                                n    = 1, 
-                                                p    = p_xi_given_x_,
-                                                dtype=theano.config.floatX)
-        
-        x_gibbs_update= T.set_subtensor(self.x_gibbs[:, target_node], samples)
-        
-        updates = OrderedDict([(self.x_gibbs, x_gibbs_update)])
-        
-        return (p_xi_given_x_, samples), updates
     
     
     

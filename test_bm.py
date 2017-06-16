@@ -71,7 +71,9 @@ bm = BoltzmannMachine(num_vars = input_dim,
                       test_inputs     = test_images,
                       algorithm       = None,
                       batch_size      = None,
+                      learning_rate   = None,
                       num_samples     = None,
+                      num_steps       = None,
                       training        = False)
                       
 bm.load_model_params(full_path = path_to_params)
@@ -81,7 +83,8 @@ start_time = timeit.default_timer()
 bm.sample_from_bm(num_chains   = num_chains, 
                   num_samples  = num_samples, 
                   num_steps    = num_steps, 
-                  save_to_path = save_to_path)
+                  save_to_path = save_to_path,
+                  test_mode    = False)
                    
 end_time = timeit.default_timer()
                    

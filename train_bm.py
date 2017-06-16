@@ -33,7 +33,7 @@ train_images     = np.round(mnist.train.images)
 
 train_labels     = mnist.train.labels
 
-num_train_images = train_images.shape[0]
+N_train          = train_images.shape[0]
 
 input_dim        = train_images.shape[1]
 
@@ -69,13 +69,13 @@ batch_size      = int(FLAGS.batch_size)
 
 learning_rate   = float(FLAGS.learning_rate)
 
-num_samples     = int(FLAGS.num_samples)
-
 experiment_tag  = FLAGS.experiment
 
 dir_name ="logs_%s"%algorithm
 
-if algorithm == "CSS_NAIVE":
+print("Algorithm : %s"%algorithm)
+
+if algorithm == "CSS":
     
    num_samples = int(FLAGS.num_samples)
 
@@ -86,6 +86,8 @@ if algorithm == "CSS_NAIVE":
 
    exp_tag = "LR%sBS%dNS%d_%s"%specs
    
+   num_steps = None
+   
 if algorithm == "CD1":
     
    num_steps = int(FLAGS.num_steps)
@@ -95,15 +97,29 @@ if algorithm == "CD1":
             num_steps,
             datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" ))
 
-   exp_tag = "LR%sBS%dNS%d_%s"%specs
+   exp_tag = "LR%sBS%dNST%d_%s"%specs
    
    num_samples = None 
+   
+if algorithm == "CSS_MF":
+    
+   num_steps = int(FLAGS.num_steps)
+   
+   num_samples = int(FLAGS.num_samples)
+   
+   specs = (str(learning_rate),
+            batch_size,
+            num_steps,
+            num_samples,
+            datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" ))
+
+   exp_tag = "LR%sBS%dNST%dNS%d_%s"%specs
    
 exp_path = os.path.join(dir_name,exp_tag)
         
 os.makedirs(exp_path)
 
-num_iterations = num_train_images // batch_size
+num_iterations = N_train // batch_size
 
 losses = []
 
@@ -124,29 +140,33 @@ epoch_time0 = start_time
 
 for epoch_index in range(num_epochs):
     
-    permuted_inds = np.random.permutation(num_train_images)
+    permuted_inds = np.random.permutation(N_train)
     
     avg_cost_val = []
     
     for iter_index in range(num_iterations):
     
-        selected_inds = permuted_inds[batch_size*iter_index:batch_size*(iter_index+1)]
+        minibatch_inds = permuted_inds[batch_size*iter_index:batch_size*(iter_index+1)]
         
         if algorithm =="CSS":
            
-           sampled_indices = bm.select_samples(selected_inds, num_samples)
+           sampled_indices = bm.select_samples(minibatch_inds)
         
-           approx_minibatch_cost = optimize(sampled_indices, list(selected_inds))
+           approx_minibatch_cost = optimize(sampled_indices, list(minibatch_inds))
+           
+        if algorithm =="CSS_MF":
+           
+           bm.do_mf_updates()
+           
+           approx_minibatch_cost = optimize(range(N_train), list(minibatch_inds))
            
         if algorithm =="CD1":
             
-           bm.get_cd_samples()
+           mf_sample, cd_sample = cd_sampling(list(minibatch_inds))
            
-           mf_sample, cd_sample = cd_sampling(list(selected_inds))
+           bm.x_gibbs.set_value(np.transpose(cd_sample)) 
            
-           bm.cd_samples.set_value(np.transpose(cd_sample)) 
-           
-           approx_minibatch_cost = optimize(list(selected_inds))
+           approx_minibatch_cost = optimize(list(minibatch_inds))
         
         avg_cost_val.append(approx_minibatch_cost)
         

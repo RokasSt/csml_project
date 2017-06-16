@@ -8,6 +8,7 @@ Machine Learning
 
 import theano
 import theano.tensor as T
+import theano.sandbox.rng_mrg
 import numpy as np
 import cPickle
 import Image
@@ -54,8 +55,11 @@ class BoltzmannMachine(object):
         
         np_rand_gen = np.random.RandomState(1234)
         
+        #self.theano_rand_gen =\
+         #T.shared_randomstreams.RandomStreams(np_rand_gen.randint(2**30))
+         
         self.theano_rand_gen =\
-         T.shared_randomstreams.RandomStreams(np_rand_gen.randint(2**30))
+         theano.sandbox.rng_mrg.MRG_RandomStreams(np_rand_gen.randint(2**30))
                                          
         self.algorithm = algorithm
     
@@ -72,9 +76,9 @@ class BoltzmannMachine(object):
            
            self.updates = OrderedDict()
            
-           self.num_examples = training_inputs.shape[0]
+           self.N_train = training_inputs.shape[0]
            
-           assert self.num_train_examples == 55000
+           assert self.N_train == 55000
            
            self.train_inputs = theano.shared(np.asarray(training_inputs,
                                           dtype=theano.config.floatX),
@@ -86,9 +90,19 @@ class BoltzmannMachine(object):
               np.sqrt(3.0 / num_vars), size = (num_vars, num_vars) )
         
               W0 = np.asarray(uniform_init, dtype = np.float64)
+              
+              W0 = (W0 + np.transpose(W0))/2.0
+              
+              W0 = W0 - np.diag(np.diag(W0))
         
               self.W = theano.shared(value= W0, name='W', borrow=True)
-           
+              
+              test_W = self.W.get_value() 
+              
+              assert sum(np.diag(test_W)) == 0.0
+              
+              assert (test_W == np.transpose(test_W)).all() == True
+              
            else:
             
               self.W = W
@@ -109,16 +123,21 @@ class BoltzmannMachine(object):
            
            self.x_tilda         = T.matrix('x_tilda')
            
-           self.train_set       = set(range(self.num_train_examples))
+           self.train_set       = set(range(self.N_train))
         
            self.minibatch_set   = T.ivector('minibatch_set')
         
            self.sample_set      = T.ivector('sample_set')
            
-           self.x_gibbs         = theano.shared(np.zeros([self.batch_size,self.num_vars])) 
+           if self.algorithm == "CD1":
            
-           self.cd_samples      = theano.shared(np.zeros([self.batch_size,self.num_vars]))
-    
+              self.x_gibbs= theano.shared(np.zeros([self.batch_size,self.num_vars]))
+              
+           if self.algorithm == "CSS_MF":
+              
+              self.mf_params = theano.shared(0.5*np.zeros([self.num_vars,self.num_samples]),\
+              name= "mf_params")
+              
         else:
             
            self.test_inputs = theano.shared(np.asarray(test_inputs,
@@ -148,34 +167,111 @@ class BoltzmannMachine(object):
   
         return -T.dot(T.transpose(x), T.dot(self.W, x)) - T.dot(T.transpose(self.b), x)
     
-    def add_css_approximation(self, num_samples):
+    def add_css_approximation(self):
         
-        """ function to compute an approximating part of parition function
-        according to Botev et al. 2017. For now uses uniform 
+        """ Function to compute an approximating part of parition
+        function according to Botev et al. 2017. For now uses uniform 
         importance sampling over the complementary set of training examples
         """
         
-        if num_samples < self.num_train_examples:
-        
-           approx_Z = self.compute_energy(self.x_tilda, self.batch_size*num_samples)
+        if self.num_samples < self.N_train:
+           print("Uniform sampling over training dataset is applied")
+           approx_Z = self.compute_energy(self.x_tilda, 
+                                          self.batch_size*self.num_samples)
            
-           approx_Z = T.reshape(approx_Z, [self.batch_size,num_samples])
+           approx_Z = T.reshape(approx_Z, [self.batch_size, self.num_samples])
         
-           approx_Z = (1.0/num_samples)*T.sum(T.exp(-approx_Z), axis=1)
+           approx_Z = (1.0/self.num_samples)*T.sum(T.exp(-approx_Z), axis=1)
            
            use_all_data = False
            
-        if num_samples == self.num_train_examples:
+        if self.num_samples == self.N_train:
+            
            print("A whole training dataset is used to estimate Z")
-           sys.exit()
-           approx_Z = self.compute_energy(self.x_tilda, num_samples)
            
-           approx_Z = (1.0/num_samples)*T.sum(T.exp(-approx_Z))
+           approx_Z = self.compute_energy(self.x_tilda, self.num_samples)
+           
+           approx_Z = (1.0/self.num_samples)*T.sum(T.exp(-approx_Z))
            
            use_all_data = True
            
         return approx_Z, use_all_data
         
+    def add_css_mf_approximation(self):
+        
+        """ function to define css approximation of normalizer Z
+        using mean-field approximation for the importance distribution.
+        This distribution is used tto sample the approximating part of Z. 
+        This approximating part is complementary to the whole training 
+        dataset."""
+        
+        approx_Z_data = self.compute_energy(self.x_tilda, self.N_train)
+        
+        approx_Z_data = T.sum(T.exp(-approx_Z_data))
+                                            
+        mf_samples, inv_q_s = self.get_mf_samples()
+        
+        mf_samples  = theano.gradient.disconnected_grad(mf_samples)
+        
+        inv_q_s     = theano.gradient.disconnected_grad(inv_q_s)
+        
+        approx_Z_mf = self.compute_energy(mf_samples, self.num_samples)
+        
+        inv_S       = 1.0/self.N_train
+        
+        approx_Z_mf = inv_S*T.sum(inv_q_s*T.exp(-approx_Z_mf))
+           
+        approx_Z    = approx_Z_data + approx_Z_mf
+           
+        return approx_Z
+        
+    def get_mf_evaluations(self, samples):
+        
+        """ function to get evaluations of mean field distribution"""
+        
+        evals = (self.mf_params**samples)*((1.0 - self.mf_params)**(1- samples))
+        
+        evals = T.prod(evals, axis=0) # axis= 0 : node index, axis=1 : nth datum
+        
+        evals = 1.0/(1.0 + evals)
+        
+        return evals
+        
+    def get_mf_samples(self):
+        
+        """ function to sample from mean-field distribution """
+        
+        samples = self.theano_rand_gen.binomial(size= (self.num_vars,self.num_samples),
+                                                n   = 1, 
+                                                p   = self.mf_params,
+                                                dtype=theano.config.floatX)
+        
+        importance_weights =  self.get_mf_evaluations(samples)
+        
+        return T.transpose(samples), importance_weights
+        
+    def add_mf_updates(self):
+        
+        """ function to add mean-field updates"""
+        
+        self.mf_updates, _ = theano.scan(lambda i: self.sigmoid_output(self.mf_params,i),
+                                   sequences = [T.arange(self.num_vars)])
+                                   
+    def do_mf_updates(self):
+        
+        """ function to implement mean-field updates for approximation
+        of data distribution"""
+        
+        updates = self.add_mf_updates()
+        
+        update_funct = theano.function(inputs=[],
+                                       outputs=[],
+                                       updates = [(self.mf_params, self.mf_updates)])
+        
+        for step in range(self.num_steps):
+            print(step)
+            update_funct()
+            
     def compute_energy(self, x, num_terms):
         
         """ function to evaluate energies over a given set of inputs """
@@ -192,22 +288,26 @@ class BoltzmannMachine(object):
         
         minibatch_energy_evals = self.compute_energy(self.x, self.batch_size)
         
-        if self.algorithm == "CSS":
+        if self.algorithm =="CSS_MF":
             
-           approx_Z, full_dataset = self.add_css_approximation(num_samples)
+           normalizer_term  = self.add_css_mf_approximation()
+           
+        if self.algorithm =="CSS":
+            
+           approx_Z, full_dataset = self.add_css_approximation()
            
            if full_dataset:
                
               normalizer_term = T.mean(approx_Z)
               
-            else:
+           else:
            
               normalizer_term = \
               T.mean(T.log(T.exp(-minibatch_energy_evals) + approx_Z) )
            
         if self.algorithm =="CD1":
            
-           normalizer_term = self.compute_energy(self.cd_samples, self.batch_size)
+           normalizer_term = self.compute_energy(self.x_gibbs, self.batch_size)
            
            normalizer_term = -T.mean(normalizer_term)
            
@@ -229,6 +329,7 @@ class BoltzmannMachine(object):
                                                  self.gibbs_samples[-1]], 
                                       givens  = {self.x_gibbs: 
                                       self.train_inputs[self.minibatch_set,:]},
+                                      # start the chain at the data distribution
                                       updates = self.gibbs_updates)
                                       
         return get_samples
@@ -240,23 +341,20 @@ class BoltzmannMachine(object):
         lrate - learning rate
         """
         
-        if self.algorithm =="CSS":
-           
-           gradients = T.grad(self.cost, self.theta)
-           
-        if self.algorithm =="CD1":
-           
-           gradients = T.grad(self.cost, 
-                              self.theta)
-           
+        gradients = T.grad(self.cost, self.theta)
+        
         for target_param, grad in zip(self.theta, gradients):
             
+            if target_param.name =="W":
+                
+               grad = grad - T.diag(T.diag(grad))
+               
             self.updates[target_param] = target_param - lrate*grad
             
             ## or T.cast(lrate, dtype = theano.config.floatX) to 
             ## guarantee compatibility with GPU
             
-    def select_samples(self, minibatch_set, num_samples):
+    def select_samples(self, minibatch_set):
         
         """ function to select samples for css approximation
         with uniform sampling
@@ -264,23 +362,25 @@ class BoltzmannMachine(object):
         
         minibatch_size = len(minibatch_set)
         
+        assert minibatch_size == self.batch_size
+        
         ##  compl_inds :: complementary set of training points
         ##  for now, complementary set is computed jointly;
         ##  uses naive approach, uniform sampling
         
-        if num_samples < self.num_train_examples:
+        if self.num_samples < self.N_train:
 
            compl_inds = list(self.train_set - set(minibatch_set))
             
            samples = np.random.choice(compl_inds,
-                                      minibatch_size*num_samples, 
+                                      minibatch_size*self.num_samples, 
                                       replace=False)
         
            samples = list(samples)
         
-           assert len(samples) == num_samples*minibatch_size
+           assert len(samples) == self.num_samples*minibatch_size
            
-        if num_samples == self.num_train_examples:
+        if self.num_samples == self.N_train:
             
            samples = list(self.train_set)
         
@@ -333,10 +433,19 @@ class BoltzmannMachine(object):
         if self.algorithm =="CD1":
             
            input_dict = {
-            self.x         : self.train_inputs[self.minibatch_set,:],
+            self.x  : self.train_inputs[self.minibatch_set,:],
             } 
             
            var_list = [self.minibatch_set]
+           
+        if self.algorithm == "CSS_MF":
+            
+           input_dict = {
+            self.x  : self.train_inputs[self.minibatch_set,:],
+            self.x_tilda: self.train_inputs[self.sample_set,:]
+            } 
+            
+           var_list = [self.sample_set, self.minibatch_set]
         
         opt_step = theano.function(inputs= var_list,
                                    outputs=self.pseudo_cost,
@@ -348,12 +457,12 @@ class BoltzmannMachine(object):
     def sigmoid_output(self, x, var_index):
         
         """ function to compute the sigmoid output for the Gibbs step
-        for fully visible Boltzmann Machine 
-        
+        for fully visible Boltzmann Machine.
         """
         
         sigmoid_activation = self.b[self.node_indices[var_index]] +\
-         2*T.dot(self.W[self.node_indices[var_index],:],x) 
+         2*(T.dot(self.W[self.node_indices[var_index],:],x) - \
+         self.W[self.node_indices[var_index],var_index]*x[var_index,:])
          
         return T.nnet.sigmoid(sigmoid_activation)
         
@@ -365,7 +474,7 @@ class BoltzmannMachine(object):
         
         p_xi_given_x_ = self.sigmoid_output(T.transpose(self.x_gibbs),target_node)
         
-        samples = self.theano_rand_gen.binomial(size = p_xi_given_x_.shape,
+        samples = self.theano_rand_gen.binomial(size = tuple(p_xi_given_x_.shape),
                                                 n    = 1, 
                                                 p    = p_xi_given_x_,
                                                 dtype=theano.config.floatX)
@@ -395,13 +504,17 @@ class BoltzmannMachine(object):
         
         cd_sampling = None
         
-        self.add_objective(self.batch_size, self.num_samples)
-
         if self.algorithm == "CD1":
 
            self.add_cd_samples()
 
            cd_sampling = self.get_cd_samples()
+           
+        if self.algorithm == "CSS_MF": 
+        
+           self.add_mf_updates()
+           
+        self.add_objective()
 
         self.add_grad_updates(self.learning_rate)   
 
