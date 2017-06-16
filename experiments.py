@@ -33,11 +33,22 @@ class Experiments(object):
          'batch_size':      '50',
          'learning_rate':   '0.05',
          'experiment'   :   'exp1_CSS_MF',
-         'num_steps'    :   '5',
+         'num_steps'    :   '4',
+         'dataset_term' :   '1',
          'num_samples'  :   '200',
+         'algorithm'    :   'CSS_MF'}
+         
+  exp5 ={'num_epochs':      '15',
+         'batch_size':      '50',
+         'learning_rate':   '0.05',
+         'experiment'   :   'exp2_CSS_MF',
+         'num_steps'    :   '4',
+         'dataset_term' :   '0',
+         'num_samples'  :   '20000',
          'algorithm'    :   'CSS_MF'}
   
   experiments= {exp1['experiment']:exp1,
                 exp2['experiment']:exp2,
                 exp3['experiment']:exp3,
-                exp4['experiment']:exp4}
+                exp4['experiment']:exp4,
+                exp5['experiment']:exp5}

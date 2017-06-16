@@ -25,6 +25,8 @@ from   model_classes import BoltzmannMachine
 print("Importing data:")
 mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 
+report_step      = 1
+
 test_images      = np.round(mnist.test.images)
 
 test_labels      = mnist.test.labels
@@ -53,6 +55,8 @@ arg_parser.add_argument('--num_samples', type = str, required = False)
 
 arg_parser.add_argument('--num_steps', type = str, required = False)
 
+arg_parser.add_argument('--dataset_term', type = str, required = False)
+
 arg_parser.add_argument('--batch_size', type= str, required=  True)
 
 arg_parser.add_argument('--learning_rate', type = str, required = True)
@@ -74,6 +78,7 @@ experiment_tag  = FLAGS.experiment
 dir_name ="logs_%s"%algorithm
 
 print("Algorithm : %s"%algorithm)
+print("Experiment: %s"%experiment_tag)
 
 if algorithm == "CSS":
     
@@ -103,9 +108,11 @@ if algorithm == "CD1":
    
 if algorithm == "CSS_MF":
     
-   num_steps = int(FLAGS.num_steps)
+   num_steps    = int(FLAGS.num_steps)
    
-   num_samples = int(FLAGS.num_samples)
+   num_samples  = int(FLAGS.num_samples)
+   
+   dataset_term = bool(int(FLAGS.dataset_term))
    
    specs = (str(learning_rate),
             batch_size,
@@ -130,7 +137,8 @@ bm = BoltzmannMachine(num_vars        = input_dim,
                       batch_size      = batch_size,
                       learning_rate   = learning_rate,
                       num_samples     = num_samples,
-                      num_steps       = num_steps)
+                      num_steps       = num_steps,
+                      dataset_term    = dataset_term)
                       
 cd_sampling, optimize = bm.add_graph()
 
@@ -158,7 +166,13 @@ for epoch_index in range(num_epochs):
            
            bm.do_mf_updates()
            
-           approx_minibatch_cost = optimize(range(N_train), list(minibatch_inds))
+           if dataset_term:
+              
+              approx_minibatch_cost = optimize(range(N_train), list(minibatch_inds))
+           
+           else:
+
+              approx_minibatch_cost = optimize(list(minibatch_inds))
            
         if algorithm =="CD1":
             
@@ -170,7 +184,7 @@ for epoch_index in range(num_epochs):
         
         avg_cost_val.append(approx_minibatch_cost)
         
-        if iter_index % 50 ==0:
+        if iter_index % report_step ==0:
             
            print('Training epoch %d ---- Iter %d ---- cost value: %f'
            %(epoch_index, iter_index, approx_minibatch_cost))

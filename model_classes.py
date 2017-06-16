@@ -29,6 +29,7 @@ class BoltzmannMachine(object):
                  learning_rate,
                  num_samples,
                  num_steps,
+                 dataset_term,
                  W= None, 
                  b= None, 
                  training = True):
@@ -51,13 +52,12 @@ class BoltzmannMachine(object):
         
         self.num_steps   = num_steps
         
+        self.dataset_term = dataset_term
+        
         self.side = int(np.sqrt(self.num_vars))
         
         np_rand_gen = np.random.RandomState(1234)
         
-        #self.theano_rand_gen =\
-         #T.shared_randomstreams.RandomStreams(np_rand_gen.randint(2**30))
-         
         self.theano_rand_gen =\
          theano.sandbox.rng_mrg.MRG_RandomStreams(np_rand_gen.randint(2**30))
                                          
@@ -178,7 +178,7 @@ class BoltzmannMachine(object):
            print("Uniform sampling over training dataset is applied")
            approx_Z = self.compute_energy(self.x_tilda, 
                                           self.batch_size*self.num_samples)
-           
+                                        
            approx_Z = T.reshape(approx_Z, [self.batch_size, self.num_samples])
         
            approx_Z = (1.0/self.num_samples)*T.sum(T.exp(-approx_Z), axis=1)
@@ -205,10 +205,16 @@ class BoltzmannMachine(object):
         This approximating part is complementary to the whole training 
         dataset."""
         
-        approx_Z_data = self.compute_energy(self.x_tilda, self.N_train)
+        if self.dataset_term:
+            
+           approx_Z_data = self.compute_energy(self.x_tilda, self.N_train)
+           
+           approx_Z_data = T.sum(T.exp(-approx_Z_data))
+           
+        else:
+           
+           approx_Z_data = 0
         
-        approx_Z_data = T.sum(T.exp(-approx_Z_data))
-                                            
         mf_samples, inv_q_s = self.get_mf_samples()
         
         mf_samples  = theano.gradient.disconnected_grad(mf_samples)
@@ -217,7 +223,7 @@ class BoltzmannMachine(object):
         
         approx_Z_mf = self.compute_energy(mf_samples, self.num_samples)
         
-        inv_S       = 1.0/self.N_train
+        inv_S       = 1.0/self.num_samples
         
         approx_Z_mf = inv_S*T.sum(inv_q_s*T.exp(-approx_Z_mf))
            
@@ -233,7 +239,9 @@ class BoltzmannMachine(object):
         
         evals = T.prod(evals, axis=0) # axis= 0 : node index, axis=1 : nth datum
         
-        evals = 1.0/(1.0 + evals)
+        #evals = 1.0/(1.0 + evals)
+        
+        evals = 1.0/(0.000000001 + evals)
         
         return evals
         
@@ -269,7 +277,7 @@ class BoltzmannMachine(object):
                                        updates = [(self.mf_params, self.mf_updates)])
         
         for step in range(self.num_steps):
-            print(step)
+            
             update_funct()
             
     def compute_energy(self, x, num_terms):
@@ -284,13 +292,13 @@ class BoltzmannMachine(object):
          
     def add_objective(self):
         
-        """ function to add the model objective """ 
+        """ function to add model objective for model optimization """ 
         
         minibatch_energy_evals = self.compute_energy(self.x, self.batch_size)
         
         if self.algorithm =="CSS_MF":
             
-           normalizer_term  = self.add_css_mf_approximation()
+           normalizer_term  = T.log(self.add_css_mf_approximation())
            
         if self.algorithm =="CSS":
             
@@ -298,7 +306,7 @@ class BoltzmannMachine(object):
            
            if full_dataset:
                
-              normalizer_term = T.mean(approx_Z)
+              normalizer_term = T.log(approx_Z)
               
            else:
            
@@ -310,7 +318,7 @@ class BoltzmannMachine(object):
            normalizer_term = self.compute_energy(self.x_gibbs, self.batch_size)
            
            normalizer_term = -T.mean(normalizer_term)
-           
+        # cost is negative log likelihood   
         self.cost = T.mean(minibatch_energy_evals) + normalizer_term
         
     def add_cd_samples(self):
@@ -347,7 +355,8 @@ class BoltzmannMachine(object):
             
             if target_param.name =="W":
                 
-               grad = grad - T.diag(T.diag(grad))
+               grad = grad - T.diag(T.diag(grad)) # no x i - xi connections
+               # for all i = 1, ..., D
                
             self.updates[target_param] = target_param - lrate*grad
             
@@ -439,13 +448,23 @@ class BoltzmannMachine(object):
            var_list = [self.minibatch_set]
            
         if self.algorithm == "CSS_MF":
+             
+           if self.dataset_term:
             
-           input_dict = {
-            self.x  : self.train_inputs[self.minibatch_set,:],
-            self.x_tilda: self.train_inputs[self.sample_set,:]
-            } 
+              input_dict = {
+                 self.x  : self.train_inputs[self.minibatch_set,:],
+                 self.x_tilda: self.train_inputs[self.sample_set,:]
+              } 
             
-           var_list = [self.sample_set, self.minibatch_set]
+              var_list = [self.sample_set, self.minibatch_set]
+        
+           else:
+              
+              input_dict = {
+                 self.x  : self.train_inputs[self.minibatch_set,:]
+              }
+              
+              var_list = [self.minibatch_set] 
         
         opt_step = theano.function(inputs= var_list,
                                    outputs=self.pseudo_cost,

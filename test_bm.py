@@ -74,6 +74,7 @@ bm = BoltzmannMachine(num_vars = input_dim,
                       learning_rate   = None,
                       num_samples     = None,
                       num_steps       = None,
+                      dataset_term    = None,
                       training        = False)
                       
 bm.load_model_params(full_path = path_to_params)
