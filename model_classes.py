@@ -22,14 +22,13 @@ class BoltzmannMachine(object):
     
     def __init__(self, 
                  num_vars, 
-                 training_inputs, 
-                 test_inputs, 
+                 training_inputs,
                  algorithm,
                  batch_size,
                  learning_rate,
                  num_samples,
                  num_steps,
-                 dataset_term,
+                 include_all,
                  W= None, 
                  b= None, 
                  training = True):
@@ -52,7 +51,7 @@ class BoltzmannMachine(object):
         
         self.num_steps   = num_steps
         
-        self.dataset_term = dataset_term
+        self.include_all = include_all
         
         self.side = int(np.sqrt(self.num_vars))
         
@@ -62,8 +61,6 @@ class BoltzmannMachine(object):
          theano.sandbox.rng_mrg.MRG_RandomStreams(np_rand_gen.randint(2**30))
                                          
         self.algorithm = algorithm
-    
-        self.num_test_examples = test_inputs.shape[0]
         
         theano.config.exception_verbosity = 'high'
         
@@ -89,7 +86,7 @@ class BoltzmannMachine(object):
               uniform_init = np_rand_gen.uniform(-np.sqrt(3.0/num_vars),\
               np.sqrt(3.0 / num_vars), size = (num_vars, num_vars) )
         
-              W0 = np.asarray(uniform_init, dtype = np.float64)
+              W0 = np.asarray(uniform_init, dtype = theano.config.floatX)
               
               W0 = (W0 + np.transpose(W0))/2.0
               
@@ -109,7 +106,7 @@ class BoltzmannMachine(object):
            
            if b is None:
         
-              bias_init = np.zeros(num_vars, dtype = np.float64)
+              bias_init = np.zeros(num_vars, dtype = theano.config.floatX)
         
               self.b = theano.shared(value= bias_init, name='b', borrow=True)
            
@@ -131,20 +128,13 @@ class BoltzmannMachine(object):
            
            if self.algorithm == "CD1":
            
-              self.x_gibbs= theano.shared(np.zeros([self.batch_size,self.num_vars]))
+              self.x_gibbs= theano.shared(np.zeros([self.batch_size,self.num_vars]),
+                                          borrow = True, name= "x_gibbs")
               
            if self.algorithm == "CSS_MF":
               
               self.mf_params = theano.shared(0.5*np.zeros([self.num_vars,self.num_samples]),\
-              name= "mf_params")
-              
-        else:
-            
-           self.test_inputs = theano.shared(np.asarray(test_inputs,
-                                         dtype=theano.config.floatX),
-                                         borrow= True)
-            
-           print("Test Phase")
+              name= "mf_params", borrow= True)
            
     def energy_function(self, x):
     
@@ -175,7 +165,7 @@ class BoltzmannMachine(object):
         """
         
         if self.num_samples < self.N_train:
-           print("Uniform sampling over training dataset is applied")
+           
            approx_Z = self.compute_energy(self.x_tilda, 
                                           self.batch_size*self.num_samples)
                                         
@@ -186,8 +176,6 @@ class BoltzmannMachine(object):
            use_all_data = False
            
         if self.num_samples == self.N_train:
-            
-           print("A whole training dataset is used to estimate Z")
            
            approx_Z = self.compute_energy(self.x_tilda, self.num_samples)
            
@@ -205,7 +193,7 @@ class BoltzmannMachine(object):
         This approximating part is complementary to the whole training 
         dataset."""
         
-        if self.dataset_term:
+        if self.include_all:
             
            approx_Z_data = self.compute_energy(self.x_tilda, self.N_train)
            
@@ -238,8 +226,6 @@ class BoltzmannMachine(object):
         evals = (self.mf_params**samples)*((1.0 - self.mf_params)**(1- samples))
         
         evals = T.prod(evals, axis=0) # axis= 0 : node index, axis=1 : nth datum
-        
-        #evals = 1.0/(1.0 + evals)
         
         evals = 1.0/(0.000000001 + evals)
         
@@ -298,7 +284,16 @@ class BoltzmannMachine(object):
         
         if self.algorithm =="CSS_MF":
             
-           normalizer_term  = T.log(self.add_css_mf_approximation())
+           approx_Z  = self.add_css_mf_approximation()
+           
+           if self.include_all:
+            
+              normalizer_term  = T.log(approx_Z)
+              
+           else:
+               
+              normalizer_term  =  \
+              T.mean(T.log(T.exp(-minibatch_energy_evals) + approx_Z) ) 
            
         if self.algorithm =="CSS":
             
@@ -449,7 +444,7 @@ class BoltzmannMachine(object):
            
         if self.algorithm == "CSS_MF":
              
-           if self.dataset_term:
+           if self.include_all:
             
               input_dict = {
                  self.x  : self.train_inputs[self.minibatch_set,:],
@@ -544,6 +539,7 @@ class BoltzmannMachine(object):
         return cd_sampling, optimize
         
     def sample_from_bm(self, 
+                       test_inputs,
                        num_chains, 
                        num_samples, 
                        num_steps, 
@@ -553,6 +549,12 @@ class BoltzmannMachine(object):
         """ function to generate images from trained 
         Boltzmann Machine (fully visible).
         """
+        
+        self.test_inputs = theano.shared(np.asarray(test_inputs,
+                                         dtype=theano.config.floatX),
+                                         borrow= True)
+                                         
+        self.num_test_examples = test_inputs.shape[0]
         
         images = np.zeros([num_chains*num_samples + num_chains, self.num_vars])
         

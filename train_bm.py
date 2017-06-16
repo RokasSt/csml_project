@@ -55,7 +55,7 @@ arg_parser.add_argument('--num_samples', type = str, required = False)
 
 arg_parser.add_argument('--num_steps', type = str, required = False)
 
-arg_parser.add_argument('--dataset_term', type = str, required = False)
+arg_parser.add_argument('--include_all', type = str, required = False)
 
 arg_parser.add_argument('--batch_size', type= str, required=  True)
 
@@ -93,6 +93,8 @@ if algorithm == "CSS":
    
    num_steps = None
    
+   include_all = None
+   
 if algorithm == "CD1":
     
    num_steps = int(FLAGS.num_steps)
@@ -106,13 +108,15 @@ if algorithm == "CD1":
    
    num_samples = None 
    
+   include_all = None
+   
 if algorithm == "CSS_MF":
     
    num_steps    = int(FLAGS.num_steps)
    
    num_samples  = int(FLAGS.num_samples)
    
-   dataset_term = bool(int(FLAGS.dataset_term))
+   include_all = bool(int(FLAGS.include_all))
    
    specs = (str(learning_rate),
             batch_size,
@@ -132,13 +136,12 @@ losses = []
 
 bm = BoltzmannMachine(num_vars        = input_dim, 
                       training_inputs = train_images,
-                      test_inputs     = test_images,
                       algorithm       = algorithm,
                       batch_size      = batch_size,
                       learning_rate   = learning_rate,
                       num_samples     = num_samples,
                       num_steps       = num_steps,
-                      dataset_term    = dataset_term)
+                      include_all    = include_all)
                       
 cd_sampling, optimize = bm.add_graph()
 
@@ -153,6 +156,8 @@ for epoch_index in range(num_epochs):
     avg_cost_val = []
     
     for iter_index in range(num_iterations):
+        
+        iter_start_time = timeit.default_timer()
     
         minibatch_inds = permuted_inds[batch_size*iter_index:batch_size*(iter_index+1)]
         
@@ -166,12 +171,12 @@ for epoch_index in range(num_epochs):
            
            bm.do_mf_updates()
            
-           if dataset_term:
-              
+           if include_all:
+              print("include all is True")
               approx_minibatch_cost = optimize(range(N_train), list(minibatch_inds))
            
            else:
-
+              
               approx_minibatch_cost = optimize(list(minibatch_inds))
            
         if algorithm =="CD1":
@@ -188,6 +193,12 @@ for epoch_index in range(num_epochs):
             
            print('Training epoch %d ---- Iter %d ---- cost value: %f'
            %(epoch_index, iter_index, approx_minibatch_cost))
+           
+        iter_end_time = timeit.default_timer()
+        
+        print('Training iteration took %f minutes'%
+        ((iter_end_time - iter_start_time) / 60.))
+        sys.exit()
         
     avg_cost_val = np.mean(avg_cost_val)
     

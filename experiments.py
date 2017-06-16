@@ -34,7 +34,7 @@ class Experiments(object):
          'learning_rate':   '0.05',
          'experiment'   :   'exp1_CSS_MF',
          'num_steps'    :   '4',
-         'dataset_term' :   '1',
+         'include_all'  :   '1',
          'num_samples'  :   '200',
          'algorithm'    :   'CSS_MF'}
          
@@ -43,8 +43,8 @@ class Experiments(object):
          'learning_rate':   '0.05',
          'experiment'   :   'exp2_CSS_MF',
          'num_steps'    :   '4',
-         'dataset_term' :   '0',
-         'num_samples'  :   '20000',
+         'include_all'  :   '0',
+         'num_samples'  :   '200',
          'algorithm'    :   'CSS_MF'}
   
   experiments= {exp1['experiment']:exp1,

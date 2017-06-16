@@ -81,7 +81,8 @@ bm.load_model_params(full_path = path_to_params)
 
 start_time = timeit.default_timer()
 
-bm.sample_from_bm(num_chains   = num_chains, 
+bm.sample_from_bm(test_inputs  = test_inputs,
+                  num_chains   = num_chains, 
                   num_samples  = num_samples, 
                   num_steps    = num_steps, 
                   save_to_path = save_to_path,
