@@ -27,6 +27,10 @@ mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 
 report_step      = 1
 
+test_mode        = False
+
+num_to_test      = 50
+
 test_images      = np.round(mnist.test.images)
 
 test_labels      = mnist.test.labels
@@ -116,20 +120,19 @@ if algorithm == "CSS_MF":
    
    num_samples  = int(FLAGS.num_samples)
    
-   include_all = bool(int(FLAGS.include_all))
+   include_all = int(FLAGS.include_all)
    
    specs = (str(learning_rate),
             batch_size,
             num_steps,
             num_samples,
+            include_all,
             datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" ))
+            
+   include_all = bool(include_all)
 
-   exp_tag = "LR%sBS%dNST%dNS%d_%s"%specs
+   exp_tag = "LR%sBS%dNST%dNS%dINC%d_%s"%specs
    
-exp_path = os.path.join(dir_name,exp_tag)
-        
-os.makedirs(exp_path)
-
 num_iterations = N_train // batch_size
 
 losses = []
@@ -142,6 +145,20 @@ bm = BoltzmannMachine(num_vars        = input_dim,
                       num_samples     = num_samples,
                       num_steps       = num_steps,
                       include_all    = include_all)
+                      
+                      
+if test_mode:
+    
+   print("Testing")
+   bm.test_compute_energy_time(num_to_test)
+   bm.test_get_mf_samples()
+   sys.exit()
+   
+else:
+    
+   exp_path = os.path.join(dir_name,exp_tag)
+        
+   os.makedirs(exp_path)
                       
 cd_sampling, optimize = bm.add_graph()
 
@@ -168,16 +185,26 @@ for epoch_index in range(num_epochs):
            approx_minibatch_cost = optimize(sampled_indices, list(minibatch_inds))
            
         if algorithm =="CSS_MF":
-           
+            
+           mf_t0 = timeit.default_timer()
            bm.do_mf_updates()
+           mf_t1 = timeit.default_timer()
+           print("4 steps of MF updates took --- %f"%((mf_t1 -mf_t0)/60.0))
            
            if include_all:
-              print("include all is True")
+              opt_t0 = timeit.default_timer()
+              ###
               approx_minibatch_cost = optimize(range(N_train), list(minibatch_inds))
-           
+              ###
+              opt_t1 = timeit.default_timer()
+              print("Optimization step took --- %f"%((opt_t1 - opt_t0)/60.0))
            else:
-              
+              opt_t0 = timeit.default_timer()
+              ###
               approx_minibatch_cost = optimize(list(minibatch_inds))
+              ###
+              opt_t1 = timeit.default_timer()
+              print("Optimization step took --- %f"%((opt_t1 - opt_t0)/60.0))
            
         if algorithm =="CD1":
             
@@ -198,7 +225,6 @@ for epoch_index in range(num_epochs):
         
         print('Training iteration took %f minutes'%
         ((iter_end_time - iter_start_time) / 60.))
-        sys.exit()
         
     avg_cost_val = np.mean(avg_cost_val)
     
@@ -216,7 +242,7 @@ for epoch_index in range(num_epochs):
     
 training_time = epoch_time0 - start_time
 
-print ('Training took %f minutes' % ( training_time / 60.))
+print('Training took %f minutes'%(training_time/ 60.))
     
 np.savetxt(os.path.join(exp_path,"TRAIN_LOSSES.dat"), losses)
 

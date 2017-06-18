@@ -15,6 +15,7 @@ import Image
 import sys
 from   utils import make_raster_plots
 from   collections import OrderedDict
+import timeit
 
 class BoltzmannMachine(object):
     
@@ -128,13 +129,14 @@ class BoltzmannMachine(object):
            
            if self.algorithm == "CD1":
            
-              self.x_gibbs= theano.shared(np.zeros([self.batch_size,self.num_vars]),
+              self.x_gibbs= theano.shared(np.zeros([self.batch_size,self.num_vars],
+                                          dtype=theano.config.floatX),
                                           borrow = True, name= "x_gibbs")
               
            if self.algorithm == "CSS_MF":
               
-              self.mf_params = theano.shared(0.5*np.zeros([self.num_vars,self.num_samples]),\
-              name= "mf_params", borrow= True)
+              self.mf_params = theano.shared(0.5*np.zeros([self.num_vars,self.num_samples],\
+              dtype=theano.config.floatX), name= "mf_params", borrow= True)
            
     def energy_function(self, x):
     
@@ -201,7 +203,7 @@ class BoltzmannMachine(object):
            
         else:
            
-           approx_Z_data = 0
+           approx_Z_data = 0.000000001
         
         mf_samples, inv_q_s = self.get_mf_samples()
         
@@ -216,7 +218,7 @@ class BoltzmannMachine(object):
         approx_Z_mf = inv_S*T.sum(inv_q_s*T.exp(-approx_Z_mf))
            
         approx_Z    = approx_Z_data + approx_Z_mf
-           
+        
         return approx_Z
         
     def get_mf_evaluations(self, samples):
@@ -291,7 +293,7 @@ class BoltzmannMachine(object):
               normalizer_term  = T.log(approx_Z)
               
            else:
-               
+              
               normalizer_term  =  \
               T.mean(T.log(T.exp(-minibatch_energy_evals) + approx_Z) ) 
            
@@ -313,7 +315,8 @@ class BoltzmannMachine(object):
            normalizer_term = self.compute_energy(self.x_gibbs, self.batch_size)
            
            normalizer_term = -T.mean(normalizer_term)
-        # cost is negative log likelihood   
+           
+        #  cost is negative log likelihood   
         self.cost = T.mean(minibatch_energy_evals) + normalizer_term
         
     def add_cd_samples(self):
@@ -461,7 +464,7 @@ class BoltzmannMachine(object):
               
               var_list = [self.minibatch_set] 
         
-        opt_step = theano.function(inputs= var_list,
+        opt_step = theano.function(inputs = var_list,
                                    outputs=self.pseudo_cost,
                                    updates=self.updates,
                                    givens = input_dict)
@@ -618,7 +621,45 @@ class BoltzmannMachine(object):
                           num_samples, 
                           num_chains, 
                           reshape_to = [self.side, self.side], 
-                          save_to_path = save_to_path)                                  
+                          save_to_path = save_to_path)    
+                          
+    def test_get_mf_samples(self):
+        
+        samples, weights = self.get_mf_samples()
+        
+        test_time = theano.function(inputs= [],
+                                    outputs=[samples, weights])
+                                    
+        t0 = timeit.default_timer()
+        output1, output2 = test_time()
+        t1 = timeit.default_timer()
+        print("Time of MF sampling for %d samples is ---- %f"%
+        (self.num_samples, (t1-t0)/60.0))
+        
+    def test_compute_energy_time(self, num_to_test):
+        
+        """ function to test time of computation """
+        
+        input_dict = {
+           self.x  : self.train_inputs[self.minibatch_set,:]
+        }
+              
+        var_list = [self.minibatch_set] 
+        
+        comp = self.compute_energy(self.x, num_to_test)
+        
+        comp = T.sum(T.exp(-comp)*comp)
+
+        test_time = theano.function(inputs= var_list,
+                                    outputs=[comp],
+                                    givens = input_dict)
+                                    
+        t0 = timeit.default_timer()
+        output = test_time(range(num_to_test))
+        t1 = timeit.default_timer()
+        print("Time of energy computation for %d inputs is ---- %f"%
+        (num_to_test, (t1-t0)/60.0))
+        
         
     def load_model_params(self, full_path):
         
@@ -647,6 +688,7 @@ class BoltzmannMachine(object):
                      protocol=cPickle.HIGHEST_PROTOCOL)
         
         file_to_save.close()
+        
         
         
             
