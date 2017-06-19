@@ -94,7 +94,7 @@ def make_raster_plots(images, num_samples, num_chains, reshape_to, save_to_path)
            
            chain_index +=1
            
-        if (image_index >= num_chains) and (image_index <= 2*num_chains):
+        if (image_index >= num_chains) and (image_index < 2*num_chains):
             
            ax[plot_index].set_title("Samples", size = 13)
                

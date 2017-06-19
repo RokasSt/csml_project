@@ -29,6 +29,8 @@ report_step      = 1
 
 test_mode        = False
 
+save_init_weights= True
+
 num_to_test      = 50
 
 test_images      = np.round(mnist.test.images)
@@ -146,10 +148,9 @@ bm = BoltzmannMachine(num_vars        = input_dim,
                       num_steps       = num_steps,
                       include_all    = include_all)
                       
-                      
 if test_mode:
     
-   print("Testing")
+   print("Testing time of computation")
    bm.test_compute_energy_time(num_to_test)
    bm.test_get_mf_samples()
    sys.exit()
@@ -159,7 +160,12 @@ else:
    exp_path = os.path.join(dir_name,exp_tag)
         
    os.makedirs(exp_path)
-                      
+   
+if save_init_weights:
+    
+   bm.save_model_params(os.path.join(exp_path,"INIT_PARAMS.model"))
+   print("saved initial weights of fully visible Boltzmann Machine")
+   
 cd_sampling, optimize = bm.add_graph()
 
 start_time = timeit.default_timer()
@@ -240,9 +246,9 @@ for epoch_index in range(num_epochs):
     
     epoch_time0 = epoch_time
     
-training_time = epoch_time0 - start_time
+training_time = (epoch_time0 - start_time)/60.0
 
-print('Training took %f minutes'%(training_time/ 60.))
+print('Training took %f minutes'%training_time)
     
 np.savetxt(os.path.join(exp_path,"TRAIN_LOSSES.dat"), losses)
 

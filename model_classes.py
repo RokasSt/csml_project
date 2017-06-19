@@ -65,6 +65,9 @@ class BoltzmannMachine(object):
         
         theano.config.exception_verbosity = 'high'
         
+        # for running with GPU
+        theano.config.device = 'cuda'
+        
         self.node_indices  = \
         theano.shared(np.arange(self.num_vars), name="node_indices")
         
@@ -478,7 +481,7 @@ class BoltzmannMachine(object):
         """
         
         sigmoid_activation = self.b[self.node_indices[var_index]] +\
-         2*(T.dot(self.W[self.node_indices[var_index],:],x) - \
+         2*(T.dot(self.W[self.node_indices[var_index],:],x) - 
          self.W[self.node_indices[var_index],var_index]*x[var_index,:])
          
         return T.nnet.sigmoid(sigmoid_activation)
@@ -544,10 +547,8 @@ class BoltzmannMachine(object):
     def sample_from_bm(self, 
                        test_inputs,
                        num_chains, 
-                       num_samples, 
-                       num_steps, 
-                       save_to_path,
-                       test_mode = True):
+                       num_samples,
+                       save_to_path):
         
         """ function to generate images from trained 
         Boltzmann Machine (fully visible).
@@ -556,7 +557,7 @@ class BoltzmannMachine(object):
         self.test_inputs = theano.shared(np.asarray(test_inputs,
                                          dtype=theano.config.floatX),
                                          borrow= True)
-                                         
+        
         self.num_test_examples = test_inputs.shape[0]
         
         images = np.zeros([num_chains*num_samples + num_chains, self.num_vars])
@@ -571,52 +572,25 @@ class BoltzmannMachine(object):
             
         images[0:num_chains,:] = init_chains
         
-        chain_vars = theano.shared(init_chains)
+        self.x_gibbs = theano.shared(init_chains)
         
         theano.config.exception_verbosity = 'high'
         
-        self.x_gibbs = chain_vars
-        
-        if test_mode:
-        
-           print(self.x_gibbs.get_value()[:,0])
-           print(self.x_gibbs.get_value()[:,1])
-           print(self.x_gibbs.get_value()[:,self.num_vars-1])
-        
-           (p_xi_given_x_, x_samples), updates =\
-           theano.scan(self.gibbs_step_fully_visible, n_steps = 1) 
-        
-           get_samples = theano.function(inputs  = [],
-                                         outputs = [p_xi_given_x_,x_samples], 
-                                         updates = updates)
-                                      
-           p, samples = get_samples()
-        
-           print("")
-           print(samples[0][0])
-           print(samples[0][1])
-           print(samples[0][self.num_vars -1])
-        
-           print("")
-           print(self.x_gibbs.get_value()[:,0])
-           print(self.x_gibbs.get_value()[:,1])
-           print(self.x_gibbs.get_value()[:,self.num_vars-1])
-           ### testing
-           sys.exit()
-        
         (p_xi_given_x_, x_samples), updates =\
-        theano.scan(self.gibbs_step_fully_visible, n_steps = num_steps) 
+        theano.scan(self.gibbs_step_fully_visible, n_steps = 1)
         
         get_samples = theano.function(inputs  = [],
-                                      outputs = [p_xi_given_x_[-1],x_samples[-1]], 
+                                      outputs = [p_xi_given_x_[0],x_samples[0]], 
                                       updates = updates)
-        
+                                      
         for ind in range(num_samples):
             
             p_out, samples_out = get_samples()
             
-            images[num_chains*(ind+1):num_chains*(ind+2),:] = np.transpose(p_out)
+            self.x_gibbs.set_value(init_chains)     
             
+            images[num_chains*(ind+1):num_chains*(ind+2),:] = np.round(np.transpose(p_out))
+        
         make_raster_plots(images, 
                           num_samples, 
                           num_chains, 

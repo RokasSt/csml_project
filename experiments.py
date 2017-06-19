@@ -22,7 +22,7 @@ class Experiments(object):
          'num_samples':     '55000',# a whole training set is used to approx. Z
          'algorithm'  :     'CSS'}
          
-  exp3 ={'num_epochs':      '15',
+  exp3 ={'num_epochs':      '20', #15
          'batch_size':      '50',
          'learning_rate':   '0.05',
          'experiment':      'exp1_CD1',

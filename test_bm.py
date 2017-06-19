@@ -46,8 +46,6 @@ arg_parser       = argparse.ArgumentParser()
 
 arg_parser.add_argument('--path_to_params', type=str,required= True)
 
-arg_parser.add_argument('--num_steps', type = str, required = True)
-
 arg_parser.add_argument('--num_samples', type = str, required = True)
 
 arg_parser.add_argument('--num_chains', type = str, required = True)
@@ -55,8 +53,6 @@ arg_parser.add_argument('--num_chains', type = str, required = True)
 FLAGS, _           = arg_parser.parse_known_args()
 
 path_to_params     = FLAGS.path_to_params
-
-num_steps          = int(FLAGS.num_steps)
 
 num_samples        = int(FLAGS.num_samples)
 
@@ -66,27 +62,24 @@ save_to_path       = os.path.split(path_to_params)[0]
 
 save_to_path       = os.path.join(save_to_path,"samples.jpeg")
 
-bm = BoltzmannMachine(num_vars = input_dim, 
-                      training_inputs = train_images,
-                      test_inputs     = test_images,
+bm = BoltzmannMachine(num_vars        = input_dim, 
+                      training_inputs = None,
                       algorithm       = None,
                       batch_size      = None,
                       learning_rate   = None,
                       num_samples     = None,
                       num_steps       = None,
-                      dataset_term    = None,
+                      include_all     = None,
                       training        = False)
                       
 bm.load_model_params(full_path = path_to_params)
 
 start_time = timeit.default_timer()
 
-bm.sample_from_bm(test_inputs  = test_inputs,
+bm.sample_from_bm(test_inputs  = test_images,
                   num_chains   = num_chains, 
-                  num_samples  = num_samples, 
-                  num_steps    = num_steps, 
-                  save_to_path = save_to_path,
-                  test_mode    = False)
+                  num_samples  = num_samples,
+                  save_to_path = save_to_path)
                    
 end_time = timeit.default_timer()
                    
