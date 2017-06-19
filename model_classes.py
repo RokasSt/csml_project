@@ -303,7 +303,7 @@ class BoltzmannMachine(object):
            
            if full_dataset:
               print("will use all of the training points for Z approximation") 
-              #normalizer_term = T.log(1e-20 + approx_Z)
+              normalizer_term = T.log(1e-20 + approx_Z)
               # test nan source
               normalizer_term  = 0
            else:
