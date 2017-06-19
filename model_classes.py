@@ -178,7 +178,7 @@ class BoltzmannMachine(object):
            use_all_data = False
            
         if self.num_samples == self.N_train:
-           print("will use all of the training points for Z approximation")
+           
            approx_Z = self.compute_energy(self.x_tilda, self.num_samples)
            
            approx_Z = (1.0/self.num_samples)*T.sum(T.exp(-approx_Z))
@@ -290,7 +290,7 @@ class BoltzmannMachine(object):
            
            if self.include_all:
             
-              normalizer_term  = T.log(1e-20 + approx_Z)
+              normalizer_term  = T.log(approx_Z)
               
            else:
               
@@ -302,9 +302,10 @@ class BoltzmannMachine(object):
            approx_Z, full_dataset = self.add_css_approximation()
            
            if full_dataset:
-               
-              normalizer_term = T.log(1e-20 + approx_Z)
-              
+              print("will use all of the training points for Z approximation") 
+              #normalizer_term = T.log(1e-20 + approx_Z)
+              # test nan source
+              normalizer_term  = 0
            else:
            
               normalizer_term = \
