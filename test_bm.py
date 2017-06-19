@@ -20,6 +20,7 @@ import datetime
 import utils
 import argparse
 import timeit
+import os
 from   model_classes import BoltzmannMachine
 
 mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
@@ -50,17 +51,23 @@ arg_parser.add_argument('--num_samples', type = str, required = True)
 
 arg_parser.add_argument('--num_chains', type = str, required = True)
 
-FLAGS, _           = arg_parser.parse_known_args()
+FLAGS, _         = arg_parser.parse_known_args()
 
-path_to_params     = FLAGS.path_to_params
+path_to_params   = FLAGS.path_to_params
 
-num_samples        = int(FLAGS.num_samples)
+num_samples      = int(FLAGS.num_samples)
 
-num_chains         = int(FLAGS.num_chains)
+num_chains       = int(FLAGS.num_chains)
 
-save_to_path       = os.path.split(path_to_params)[0]
+split_path       = os.path.split(path_to_params)
 
-save_to_path       = os.path.join(save_to_path,"samples.jpeg")
+if "INIT" in split_path[1]:
+    
+   save_to_path = os.path.join(split_path[0],"samples_init.jpeg")
+   
+else:
+    
+   save_to_path = os.path.join(split_path[0],"samples.jpeg")
 
 bm = BoltzmannMachine(num_vars        = input_dim, 
                       training_inputs = None,

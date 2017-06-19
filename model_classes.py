@@ -65,9 +65,6 @@ class BoltzmannMachine(object):
         
         theano.config.exception_verbosity = 'high'
         
-        # for running with GPU
-        theano.config.device = 'cuda'
-        
         self.node_indices  = \
         theano.shared(np.arange(self.num_vars), name="node_indices")
         

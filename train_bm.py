@@ -14,13 +14,11 @@ import sys
 import json
 import tensorflow as tf
 from   tensorflow.examples.tutorials.mnist import input_data
-import theano
-import theano.tensor as T
 import datetime
 import utils
 import argparse
 import timeit
-from   model_classes import BoltzmannMachine
+import os
 
 print("Importing data:")
 mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
@@ -53,9 +51,9 @@ validate_labels  = mnist.validation.labels
 
 arg_parser       = argparse.ArgumentParser()
 
-arg_parser.add_argument('--num_epochs', type=str,required= True)
+arg_parser.add_argument('--num_epochs', type = str,required= True)
 
-arg_parser.add_argument('--algorithm', type=str,required= True)
+arg_parser.add_argument('--algorithm', type = str,required= True)
 
 arg_parser.add_argument('--num_samples', type = str, required = False)
 
@@ -63,17 +61,21 @@ arg_parser.add_argument('--num_steps', type = str, required = False)
 
 arg_parser.add_argument('--include_all', type = str, required = False)
 
-arg_parser.add_argument('--batch_size', type= str, required=  True)
+arg_parser.add_argument('--batch_size', type = str, required=  True)
 
 arg_parser.add_argument('--learning_rate', type = str, required = True)
 
 arg_parser.add_argument('--experiment', type = str, required = True)
+
+arg_parser.add_argument('--use_gpu', type = str, required = True)
 
 FLAGS, _        = arg_parser.parse_known_args()
 
 algorithm       = FLAGS.algorithm
 
 num_epochs      = int(FLAGS.num_epochs)
+
+use_gpu         = int(FLAGS.use_gpu)
 
 batch_size      = int(FLAGS.batch_size)
 
@@ -138,6 +140,14 @@ if algorithm == "CSS_MF":
 num_iterations = N_train // batch_size
 
 losses = []
+
+if bool(use_gpu):    
+   print("Will attempt to use GPU")
+   os.environ['THEANO_FLAGS'] = 'device=cuda'
+   
+import theano
+import theano.tensor as T
+from   model_classes import BoltzmannMachine
 
 bm = BoltzmannMachine(num_vars        = input_dim, 
                       training_inputs = train_images,
