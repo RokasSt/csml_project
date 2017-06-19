@@ -181,7 +181,10 @@ class BoltzmannMachine(object):
            
            approx_Z = self.compute_energy(self.x_tilda, self.num_samples)
            
-           approx_Z = (1.0/self.num_samples)*T.sum(T.exp(-approx_Z))
+           max_val  = T.max(-approx_Z)
+           
+           approx_Z = (1.0/self.num_samples)*\
+           (max_val + T.sum(T.exp(-approx_Z -max_val)))
            
            use_all_data = True
            
@@ -303,9 +306,8 @@ class BoltzmannMachine(object):
            
            if full_dataset:
               print("will use all of the training points for Z approximation") 
-              normalizer_term = T.log(1e-20 + approx_Z)
-              # test nan source
-              normalizer_term  = 0
+              normalizer_term = T.log(approx_Z)
+              
            else:
            
               normalizer_term = \
@@ -468,7 +470,8 @@ class BoltzmannMachine(object):
         opt_step = theano.function(inputs = var_list,
                                    outputs=self.pseudo_cost,
                                    updates=self.updates,
-                                   givens = input_dict)
+                                   givens = input_dict,
+                                   on_unused_input='warn')
         
         return opt_step
          
