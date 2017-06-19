@@ -10,6 +10,8 @@ import numpy as np
 import theano.tensor as T
 import theano
 import sys
+import matplotlib
+matplotlib.use('agg',warn=False, force=True)
 from matplotlib import pyplot as plt
 
 def energy_function(W, b, x):
