@@ -303,7 +303,7 @@ class BoltzmannMachine(object):
            
            if full_dataset:
                
-              normalizer_term = T.log(approx_Z)
+              normalizer_term = T.log(1e-20 + approx_Z)
               
            else:
            
