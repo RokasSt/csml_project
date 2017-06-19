@@ -12,8 +12,9 @@ class Experiments(object):
          'batch_size':      '50',
          'learning_rate':   '0.05',
          'experiment':      'exp1_CSS',
-         'num_samples':     '100',
-         'algorithm'  :     'CSS'}
+         'num_samples':     '200',
+         'algorithm'  :     'CSS',
+         'use_gpu'    :     '1'}
          
   exp2 ={'num_epochs':      '15',
          'batch_size':      '50',
