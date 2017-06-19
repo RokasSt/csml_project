@@ -21,7 +21,7 @@ class Experiments(object):
          'experiment':      'exp2_CSS',
          'num_samples':     '55000',# a whole training set is used to approx. Z
          'algorithm'  :     'CSS',
-         'use_gpu'    :     '1'}
+         'use_gpu'    :     '0'}
          
   exp3 ={'num_epochs':      '20', #15
          'batch_size':      '50',
