@@ -59,7 +59,7 @@ arg_parser.add_argument('--num_samples', type = str, required = False)
 
 arg_parser.add_argument('--num_steps', type = str, required = False)
 
-arg_parser.add_argument('--include_all', type = str, required = False)
+arg_parser.add_argument('--data_term', type = str, required = False)
 
 arg_parser.add_argument('--batch_size', type = str, required=  True)
 
@@ -101,7 +101,7 @@ if algorithm == "CSS":
    
    num_steps = None
    
-   include_all = None
+   data_term = None
    
 if algorithm == "CD1":
     
@@ -116,7 +116,7 @@ if algorithm == "CD1":
    
    num_samples = None 
    
-   include_all = None
+   data_term = None
    
 if algorithm == "CSS_MF":
     
@@ -124,16 +124,16 @@ if algorithm == "CSS_MF":
    
    num_samples  = int(FLAGS.num_samples)
    
-   include_all = int(FLAGS.include_all)
+   data_term    = int(FLAGS.data_term)
    
    specs = (str(learning_rate),
             batch_size,
             num_steps,
             num_samples,
-            include_all,
+            data_term,
             datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" ))
             
-   include_all = bool(include_all)
+   data_term = bool(data_term)
 
    exp_tag = "LR%sBS%dNST%dNS%dINC%d_%s"%specs
    
@@ -156,7 +156,7 @@ bm = BoltzmannMachine(num_vars        = input_dim,
                       learning_rate   = learning_rate,
                       num_samples     = num_samples,
                       num_steps       = num_steps,
-                      include_all    = include_all)
+                      data_term       = data_term)
                       
 if test_mode:
     
@@ -196,7 +196,13 @@ for epoch_index in range(num_epochs):
         
         if algorithm =="CSS":
            
-           sampled_indices = bm.select_samples(minibatch_inds)
+           if num_samples == N_train:
+              
+              sampled_indices = list(range(N_train))
+              
+           else:
+               
+              sampled_indices = bm.select_samples(minibatch_inds)
         
            approx_minibatch_cost = optimize(sampled_indices, list(minibatch_inds))
            
@@ -207,10 +213,12 @@ for epoch_index in range(num_epochs):
            mf_t1 = timeit.default_timer()
            print("4 steps of MF updates took --- %f"%((mf_t1 -mf_t0)/60.0))
            
-           if include_all:
+           if data_term:
+              
               opt_t0 = timeit.default_timer()
               ###
-              approx_minibatch_cost = optimize(range(N_train), list(minibatch_inds))
+              approx_minibatch_cost = optimize(list(range(N_train)), 
+                                               list(minibatch_inds))
               ###
               opt_t1 = timeit.default_timer()
               print("Optimization step took --- %f"%((opt_t1 - opt_t0)/60.0))

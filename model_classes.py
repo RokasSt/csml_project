@@ -29,7 +29,7 @@ class BoltzmannMachine(object):
                  learning_rate,
                  num_samples,
                  num_steps,
-                 include_all,
+                 data_term,
                  W= None, 
                  b= None, 
                  training = True):
@@ -52,7 +52,7 @@ class BoltzmannMachine(object):
         
         self.num_steps   = num_steps
         
-        self.include_all = include_all
+        self.data_term   = data_term
         
         self.side = int(np.sqrt(self.num_vars))
         
@@ -159,36 +159,49 @@ class BoltzmannMachine(object):
   
         return -T.dot(T.transpose(x), T.dot(self.W, x)) - T.dot(T.transpose(self.b), x)
     
-    def add_css_approximation(self):
+    def add_css_approximation(self, minibatch_evals):
         
         """ Function to compute an approximating part of parition
-        function according to Botev et al. 2017. For now uses uniform 
+        function according to Botev et al. 2017. Uses uniform 
         importance sampling over the complementary set of training examples
         """
         
-        if self.num_samples < self.N_train:
-           
-           approx_Z = self.compute_energy(self.x_tilda, 
+        if (self.num_samples < self.N_train):
+           print("Will use uniform sample from training set for Z approximation")
+           approx_Z = -self.compute_energy(self.x_tilda, 
                                           self.batch_size*self.num_samples)
                                         
            approx_Z = T.reshape(approx_Z, [self.batch_size, self.num_samples])
-        
-           approx_Z = (1.0/self.num_samples)*T.sum(T.exp(-approx_Z), axis=1)
            
-           use_all_data = False
+           approx_Z = approx_Z - T.log(self.num_samples)
+           
+           minibatch_evals = -T.reshape(minibatch_evals, [self.batch_size,1])
+           
+           approx_Z = T.concatenate([approx_Z, minibatch_evals],axis = 1)
+           
+           max_vals  = T.max(approx_Z, axis=1)
+
+           max_vals  = T.reshape(max_vals,[self.batch_size,1])
+           
+           max_vals_tiled  = T.tile(max_vals,(1,self.num_samples+1))
+           
+           approx_Z = approx_Z - max_vals_tiled
+        
+           approx_Z = max_vals + T.log(T.sum(T.exp(approx_Z), axis=1))
+           
+           approx_Z = T.mean(approx_Z)
            
         if self.num_samples == self.N_train:
+           print("Will use all of the training points for Z approximation") 
+           approx_Z = -self.compute_energy(self.x_tilda, self.num_samples)
            
-           approx_Z = self.compute_energy(self.x_tilda, self.num_samples)
+           approx_Z = approx_Z - T.log(self.num_samples)
            
-           max_val  = T.max(-approx_Z)
+           max_val  = T.max(approx_Z)
            
-           approx_Z = (1.0/self.num_samples)*\
-           (max_val + T.sum(T.exp(-approx_Z -max_val)))
+           approx_Z = max_val + T.log(T.sum(T.exp(approx_Z -max_val)))
            
-           use_all_data = True
-           
-        return approx_Z, use_all_data
+        return approx_Z
         
     def add_css_mf_approximation(self):
         
@@ -198,29 +211,32 @@ class BoltzmannMachine(object):
         This approximating part is complementary to the whole training 
         dataset."""
         
-        if self.include_all:
-            
-           approx_Z_data = self.compute_energy(self.x_tilda, self.N_train)
-           
-           approx_Z_data = T.sum(T.exp(-approx_Z_data))
-           
-        else:
-           
-           approx_Z_data = 0.000000001
-        
         mf_samples, inv_q_s = self.get_mf_samples()
         
         mf_samples  = theano.gradient.disconnected_grad(mf_samples)
         
         inv_q_s     = theano.gradient.disconnected_grad(inv_q_s)
         
-        approx_Z_mf = self.compute_energy(mf_samples, self.num_samples)
+        inv_q_s_S   = T.log(self.num_samples*inv_q_s)
         
-        inv_S       = 1.0/self.num_samples
+        approx_Z_mf = -self.compute_energy(mf_samples, self.num_samples)
         
-        approx_Z_mf = inv_S*T.sum(inv_q_s*T.exp(-approx_Z_mf))
+        aprox_Z_mf  = approx_Z_mf - inv_q_s_S
+        
+        if self.data_term:
+           print("Will explicitly include training set in Z approximation")
            
-        approx_Z    = approx_Z_data + approx_Z_mf
+           approx_Z    = -self.compute_energy(self.x_tilda, self.N_train)
+        
+           approx_Z    = T.concatenate([approx_Z_mf, approx_Z])
+           
+        else:
+            
+           approx_Z    = approx_Z_mf
+        
+        max_val  = T.max(approx_Z)
+           
+        approx_Z = max_val + T.log(T.sum(T.exp(approx_Z - max_val)))
         
         return approx_Z
         
@@ -289,29 +305,11 @@ class BoltzmannMachine(object):
         
         if self.algorithm =="CSS_MF":
             
-           approx_Z  = self.add_css_mf_approximation()
-           
-           if self.include_all:
-            
-              normalizer_term  = T.log(approx_Z)
-              
-           else:
-              
-              normalizer_term  =  \
-              T.mean(T.log(T.exp(-minibatch_energy_evals) + approx_Z) ) 
+           normalizer_term  = self.add_css_mf_approximation()
            
         if self.algorithm =="CSS":
             
-           approx_Z, full_dataset = self.add_css_approximation()
-           
-           if full_dataset:
-              print("will use all of the training points for Z approximation") 
-              normalizer_term = T.log(approx_Z)
-              
-           else:
-           
-              normalizer_term = \
-              T.mean(T.log(T.exp(-minibatch_energy_evals) + approx_Z) )
+           normalizer_term = self.add_css_approximation(minibatch_energy_evals)
            
         if self.algorithm =="CD1":
            
@@ -450,8 +448,8 @@ class BoltzmannMachine(object):
            
         if self.algorithm == "CSS_MF":
              
-           if self.include_all:
-            
+           if self.data_term:
+              
               input_dict = {
                  self.x  : self.train_inputs[self.minibatch_set,:],
                  self.x_tilda: self.train_inputs[self.sample_set,:]
@@ -631,6 +629,7 @@ class BoltzmannMachine(object):
                                     
         t0 = timeit.default_timer()
         output = test_time(range(num_to_test))
+        print(output.shape)
         t1 = timeit.default_timer()
         print("Time of energy computation for %d inputs is ---- %f"%
         (num_to_test, (t1-t0)/60.0))

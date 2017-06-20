@@ -24,30 +24,33 @@ class Experiments(object):
          'algorithm'  :     'CSS',
          'use_gpu'    :     '1'}
          
-  exp3 ={'num_epochs':      '20', #15
+  exp3 ={'num_epochs':      '15',
          'batch_size':      '50',
          'learning_rate':   '0.05',
          'experiment':      'exp1_CD1',
          'num_steps':       '1',
-         'algorithm'  :     'CD1'}
+         'algorithm'  :     'CD1',
+         'use_gpu'    :     '1'}
          
   exp4 ={'num_epochs':      '15',
          'batch_size':      '50',
          'learning_rate':   '0.05',
          'experiment'   :   'exp1_CSS_MF',
          'num_steps'    :   '4',
-         'include_all'  :   '1',
+         'data_term'    :   '1',
          'num_samples'  :   '200',
-         'algorithm'    :   'CSS_MF'}
+         'algorithm'    :   'CSS_MF',
+         'use_gpu'    :     '1'}
          
   exp5 ={'num_epochs':      '15',
          'batch_size':      '50',
          'learning_rate':   '0.05',
          'experiment'   :   'exp2_CSS_MF',
          'num_steps'    :   '4',
-         'include_all'  :   '0',
+         'data_term'    :   '0',
          'num_samples'  :   '200',
-         'algorithm'    :   'CSS_MF'}
+         'algorithm'    :   'CSS_MF',
+         'use_gpu'    :     '1'}
   
   experiments= {exp1['experiment']:exp1,
                 exp2['experiment']:exp2,
