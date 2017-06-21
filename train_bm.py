@@ -25,11 +25,7 @@ mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 
 report_step      = 1
 
-test_mode        = False
-
 save_init_weights= True
-
-num_to_test      = 50
 
 test_images      = np.round(mnist.test.images)
 
@@ -59,7 +55,9 @@ arg_parser.add_argument('--num_samples', type = str, required = False)
 
 arg_parser.add_argument('--num_steps', type = str, required = False)
 
-arg_parser.add_argument('--data_term', type = str, required = False)
+arg_parser.add_argument('--num_data', type = str, required = False)
+
+arg_parser.add_argument('--resample', type = str, required = False)
 
 arg_parser.add_argument('--batch_size', type = str, required=  True)
 
@@ -88,24 +86,11 @@ dir_name ="logs_%s"%algorithm
 print("Algorithm : %s"%algorithm)
 print("Experiment: %s"%experiment_tag)
 
-if algorithm == "CSS":
-    
-   num_samples = int(FLAGS.num_samples)
-
-   specs = (str(learning_rate),
-            batch_size, 
-            num_samples, 
-            datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" ))
-
-   exp_tag = "LR%sBS%dNS%d_%s"%specs
-   
-   num_steps = None
-   
-   data_term = None
-   
 if algorithm == "CD1":
     
-   num_steps = int(FLAGS.num_steps)
+   assert FLAGS.num_steps != None 
+    
+   num_cd_steps = int(FLAGS.num_steps)
    
    specs = (str(learning_rate),
             batch_size,
@@ -116,26 +101,50 @@ if algorithm == "CD1":
    
    num_samples = None 
    
-   data_term = None
+   num_data    = None
    
-if algorithm == "CSS_MF":
+   resample    = None
+   
+if algorithm   == "CSS":
+   
+   assert FLAGS.num_samples != None
+   
+   assert FLAGS.num_data    != None
     
-   num_steps    = int(FLAGS.num_steps)
+   num_cd_steps   = None
    
-   num_samples  = int(FLAGS.num_samples)
+   num_samples    = int(FLAGS.num_samples)
    
-   data_term    = int(FLAGS.data_term)
+   num_data       = int(FLAGS.num_data)
    
-   specs = (str(learning_rate),
-            batch_size,
-            num_steps,
-            num_samples,
-            data_term,
-            datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" ))
-            
-   data_term = bool(data_term)
-
-   exp_tag = "LR%sBS%dNST%dNS%dINC%d_%s"%specs
+   if num_samples ==0:
+   
+      specs = (str(learning_rate),
+               batch_size,
+               num_samples,
+               num_data,
+               datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" ))
+   
+      exp_tag = "LR%sBS%dNS%dNUM_DATA%d_%s"%specs
+      
+      resample = None
+      
+   if num_samples > 0:
+       
+      assert FLAGS.resample != None
+       
+      resample = int(FLAGS.resample)
+       
+      specs = (str(learning_rate),
+               batch_size,
+               num_samples,
+               resample,
+               num_data,
+               datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" ))
+   
+      exp_tag = "LR%sBS%dNS%dRS%dNUM_DATA%d_%s"%specs
+      
+      resample = bool(resample)
    
 num_iterations = N_train // batch_size
 
@@ -155,21 +164,13 @@ bm = BoltzmannMachine(num_vars        = input_dim,
                       batch_size      = batch_size,
                       learning_rate   = learning_rate,
                       num_samples     = num_samples,
-                      num_steps       = num_steps,
-                      data_term       = data_term)
-                      
-if test_mode:
+                      num_cd_steps    = num_cd_steps,
+                      num_data        = num_data,
+                      unique_samples  = resample)
     
-   print("Testing time of computation")
-   bm.test_compute_energy_time(num_to_test)
-   bm.test_get_mf_samples()
-   sys.exit()
-   
-else:
-    
-   exp_path = os.path.join(dir_name,exp_tag)
+exp_path = os.path.join(dir_name,exp_tag)
         
-   os.makedirs(exp_path)
+os.makedirs(exp_path)
    
 if save_init_weights:
     
@@ -196,40 +197,30 @@ for epoch_index in range(num_epochs):
         
         if algorithm =="CSS":
            
-           if num_samples == N_train:
+           if num_samples > 0:
               
-              sampled_indices = list(range(N_train))
+              #mf_t0 = timeit.default_timer()
+              #bm.do_mf_updates(num_steps =4)
+              #mf_t1 = timeit.default_timer()
+              #print("4 steps of MF updates took --- %f"%((mf_t1 -mf_t0)/60.0))
+              # alternatively, try reinitiate distribution.
               
-           else:
-               
-              sampled_indices = bm.select_samples(minibatch_inds)
+              reinit_mf = bm.np_rand_gen.uniform(0,1, size = (bm.num_vars, bm.num_samples))
         
-           approx_minibatch_cost = optimize(sampled_indices, list(minibatch_inds))
-           
-        if algorithm =="CSS_MF":
-            
-           mf_t0 = timeit.default_timer()
-           bm.do_mf_updates()
-           mf_t1 = timeit.default_timer()
-           print("4 steps of MF updates took --- %f"%((mf_t1 -mf_t0)/60.0))
-           
-           if data_term:
+              reinit_mf = np.asarray(reinit_mf, dtype = theano.config.floatX)
               
-              opt_t0 = timeit.default_timer()
-              ###
-              approx_minibatch_cost = optimize(list(range(N_train)), 
-                                               list(minibatch_inds))
-              ###
-              opt_t1 = timeit.default_timer()
-              print("Optimization step took --- %f"%((opt_t1 - opt_t0)/60.0))
-           else:
-              opt_t0 = timeit.default_timer()
-              ###
-              approx_minibatch_cost = optimize(list(minibatch_inds))
-              ###
-              opt_t1 = timeit.default_timer()
-              print("Optimization step took --- %f"%((opt_t1 - opt_t0)/60.0))
+              bm.mf_params.set_value(reinit_mf)
+              
+           sampled_indices = bm.select_data(minibatch_inds)
            
+           opt_t0 = timeit.default_timer()
+           ###
+           approx_minibatch_cost = optimize(sampled_indices, 
+                                            list(minibatch_inds))
+           ###
+           opt_t1 = timeit.default_timer()
+           print("Optimization step took --- %f"%((opt_t1 - opt_t0)/60.0))
+            
         if algorithm =="CD1":
             
            mf_sample, cd_sample = cd_sampling(list(minibatch_inds))

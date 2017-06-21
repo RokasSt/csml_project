@@ -5,6 +5,7 @@ Theano functionality
 """
 import theano
 import theano.tensor as T
+import theano.sandbox.rng_mrg
 import numpy as np
 from   collections import OrderedDict
 
@@ -21,6 +22,19 @@ class Test(object):
         self.indices  = theano.shared(np.arange(self.num_vals))
         
         self.test_shared_x = theano.shared(value = 10, name ="test_shared_x")
+        
+        np_rand_gen = np.random.RandomState(1234)
+        
+        self.theano_rand_gen =\
+         theano.sandbox.rng_mrg.MRG_RandomStreams(np_rand_gen.randint(2**30))
+        
+        self.num_vars        = 10
+        
+        self.num_samples     = 8
+        
+        self.minibatch_size  = 3
+        
+        self.mf_params = theano.shared(0.5*np.ones([self.num_vars,self.num_samples]))
         
     def update_node(self, target_node):
         
@@ -74,7 +88,36 @@ class Test(object):
         
         print(val)
         print(val_dummy)
-                                      
+        
+    def get_mf_samples(self):
+        
+        """ function to sample from mean-field distribution """
+        
+        samples = self.theano_rand_gen.binomial(size= (self.num_vars, self.num_samples),
+                                                n   = 1, 
+                                                p   = self.mf_params,
+                                                dtype=theano.config.floatX)
+                                                
+        return samples
+        
+    def test_get_mf_samples(self):
+        
+        list_samples, updates = theano.scan(self.get_mf_samples, n_steps =2)
+        
+        #importance_weights =  self.get_mf_evaluations(samples)
+        
+        test_funct = theano.function(inputs  = [],
+                                     outputs = list_samples,
+                                     updates = updates)
+        
+        samples_out = test_funct()
+        
+        print(len(samples_out))
+        print(samples_out[0].shape)
+        print((samples_out[0] == samples_out[1]).all())
+        print(samples_out[0])
+        print(samples_out[1])
+        
 if __name__ == "__main__":
     
    to_test = Test(num_vals =4)
@@ -84,5 +127,7 @@ if __name__ == "__main__":
    to_test.test_functions(use_givens = True)
    
    to_test.test_givens_shared_to_shared()
+   
+   to_test.test_get_mf_samples()
    
 
