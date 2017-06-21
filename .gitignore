@@ -1,4 +1,4 @@
-/MNIST_data
+/*/MNIST_data
 *.pyc
 *.*~
-/logs_*
+/*/logs_*
