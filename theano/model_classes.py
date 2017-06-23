@@ -90,15 +90,20 @@ class BoltzmannMachine(object):
                                           
            if test_mode:
               
-              b = np.ones(self.num_vars, dtype = theano.config.floatX)
+              b_init =self.np_rand_gen.uniform(0,1, num_vars)
         
-              W = np.ones([self.num_vars, self.num_vars], 
-                          dtype = theano.config.floatX)
+              self.b_init= np.asarray(b_init, dtype = theano.config.floatX)
         
-              self.b = theano.shared(b, name='b', borrow = True)
+              W_init =self.np_rand_gen.uniform(0,1, size = (num_vars, num_vars))
         
-              self.W = theano.shared(W, name='W', borrow = True)
+              self.W_init= np.asarray(W_init, dtype = theano.config.floatX)
+              
+              self.b = theano.shared(self.b_init, name='b', borrow = False)
+        
+              self.W = theano.shared(self.W_init, name='W', borrow = False)
+              
               print("Initialized with test mode")
+              
            else:
                                           
               if W is None:
@@ -801,15 +806,9 @@ class BoltzmannMachine(object):
         
         do_updates = OrderedDict()
         
-        b = np.ones(self.num_vars, 
-                    dtype = theano.config.floatX)
+        self.b.set_value(self.b_init)
         
-        W = np.ones([self.num_vars, self.num_vars], 
-                    dtype = theano.config.floatX)
-        
-        self.b.set_value(b)
-        
-        self.W.set_value(W)
+        self.W.set_value(self.W_init)
         
         gradW = theano.shared(np.zeros([self.num_vars,self.num_vars]))
         
