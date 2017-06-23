@@ -848,7 +848,9 @@ class BoltzmannMachine(object):
         
         do_updates.update(updates)
         
-        ## ML objective log likelihood:
+        ## ML objective log likelihood (ascend gradient)
+        ## the first, more efficient implementation uses the cost
+        ## objective which is negative of the log likelihood.
         
         do_updates.update([(self.W, self.W + self.learning_rate*gradW)])
         
