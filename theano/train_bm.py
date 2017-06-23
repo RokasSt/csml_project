@@ -26,7 +26,7 @@ mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 
 report_step          = 1
 
-test_mode            = True
+test_mode            = False
 
 save_images          = True
 
@@ -199,6 +199,8 @@ if algorithm   == "CSS":
       exp_tag = "LR%sBS%dNS%dRS%dDATA%dMF%d_%s"%specs
       
       resample = bool(resample)
+      
+      learning_rate = (1.0/(1+num_epochs/100.))*learning_rate/batch_size
    
 num_iterations = N_train // batch_size
 
@@ -354,24 +356,36 @@ for epoch_index in range(num_epochs):
               
               is_samples = np.asarray(is_samples, dtype = theano.config.floatX)
               
-              approx_minibatch_cost = optimize(is_samples, list(minibatch_inds))
-              
-              if test_mode:
+              if not test_mode:
                   
-                 W_implicit = bm.W.get_value()
-              
-                 b_implicit = bm.b.get_value()
+                 approx_minibatch_cost = optimize(is_samples, list(minibatch_inds))
                   
-                 bm.test_grad_computations(is_samples, list(minibatch_inds))
+              else:
+                      
+                 t0 = timeit.default_timer()
+                 approx_minibatch_cost = optimize(is_samples, list(minibatch_inds))
+                 t1 = timeit.default_timer()
+                 print("Gradient computation with implementation 1 took"+\
+                 " --- %f minutes"%((t1 - t0)/60.0))
                  
-                 W_explicit = bm.W.get_value()
+                 W_implicit = np.asarray(bm.W.get_value())
               
-                 b_explicit = bm.b.get_value()
+                 b_implicit = np.asarray(bm.b.get_value())
+                 
+                 t0 = timeit.default_timer()
+                 bm.test_grad_computations(is_samples, list(minibatch_inds))
+                 t1 = timeit.default_timer()
+                 print("Gradient computation with implementation 2 took "+\
+                 "--- %f minutes"%((t1 - t0)/60.0))
+              
+                 W_explicit = np.asarray(bm.W.get_value())
+              
+                 b_explicit = np.asarray(bm.b.get_value())
                  
                  print("Equivalence of W updates in two implementations:")
-                 print((W_implicit == W_explicit).all())
+                 print((np.round(W_implicit,12) == np.round(W_explicit,12)).all())
                  print("Equivalence of b updates in two implementations:")
-                 print((b_implicit == b_explicit).all())
+                 print((np.round(b_implicit,12) == np.round(b_explicit,12)).all())
                  sys.exit()
            ###
            opt_t1 = timeit.default_timer()
@@ -402,7 +416,7 @@ for epoch_index in range(num_epochs):
     
     losses.append(avg_cost_val)
         
-    print('Training epoch %d ----- average cost value: %f'
+    print('Training epoch %d ---- average cost value: %f'
     %(epoch_index, avg_cost_val))
     
     epoch_time = timeit.default_timer()

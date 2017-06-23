@@ -91,10 +91,15 @@ class BoltzmannMachine(object):
            if test_mode:
               
               b_init =self.np_rand_gen.uniform(0,1, num_vars)
-        
-              self.b_init= np.asarray(b_init, dtype = theano.config.floatX)
-        
+    
               W_init =self.np_rand_gen.uniform(0,1, size = (num_vars, num_vars))
+              
+              # also tested ones
+              # b_init = np.ones(num_vars)
+    
+              # W_init = np.ones([num_vars, num_vars])
+              
+              self.b_init= np.asarray(b_init, dtype = theano.config.floatX)
         
               self.W_init= np.asarray(W_init, dtype = theano.config.floatX)
               
@@ -111,6 +116,10 @@ class BoltzmannMachine(object):
                  uniform_init =\
                  self.np_rand_gen.uniform(-np.sqrt(3.0/(num_vars)),\
                  np.sqrt(3.0 / (num_vars)), size = (num_vars, num_vars))
+                 
+                 #uniform_init =\
+                 #self.np_rand_gen.uniform(-0.00000001,\
+                 #0.00000001, size = (num_vars, num_vars)) 
         
                  W0 = np.asarray(uniform_init, dtype = theano.config.floatX)
               
@@ -304,7 +313,7 @@ class BoltzmannMachine(object):
         if (axis == None) and (non_data_term != None):
            
            approx_Z = T.concatenate([non_data_term, data_term])
-              
+           
            max_val  = T.max(approx_Z)
            
            approx_Z = approx_Z - max_val
@@ -781,13 +790,13 @@ class BoltzmannMachine(object):
         
         all_energies = T.concatenate([minibatch_energies, sample_energies])
         
-        max_val = theano.gradient.disconnected_grad(T.max(all_energies))
+        max_val  = T.max(all_energies)
               
         approx_Z = all_energies - max_val
         
         p_tilda = T.exp(approx_Z)
         
-        self.p_tilda = p_tilda/ T.sum(T.exp(approx_Z))
+        self.p_tilda = p_tilda/ T.sum(p_tilda)
         
     def xn_xn_prod(self,x_n):
         
@@ -800,7 +809,8 @@ class BoltzmannMachine(object):
     
     def test_grad_computations(self, samples, training_points):
         
-        """ function to test gradient computations explicitly """
+        """ function to test gradient computations explicitly
+        (implementation 2) """
         
         self.add_p_tilda()
         
@@ -816,10 +826,10 @@ class BoltzmannMachine(object):
         
         [gradW, gradb], updates =\
          theano.scan(lambda i, gradW, gradb: [gradW+ \
-        (1-self.batch_size*self.p_tilda[i])\
+        (1.0-self.batch_size*self.p_tilda[i])\
         *self.xn_xn_prod(self.x[i,:]),
         gradb+ \
-        (1-self.batch_size*self.p_tilda[i])\
+        (1.0-self.batch_size*self.p_tilda[i])\
         *self.x[i,:]],
         outputs_info =[gradW, gradb],
         sequences =[T.arange(self.batch_size)])

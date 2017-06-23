@@ -4,7 +4,18 @@ d=28;
 D=d*d;
 
 % make some fake training data:
-x=1.0*(randn(D,N)>0);
+% x=1.0*(randn(D,N)>0);
+
+% MNIST data:
+
+path =['../theano/logs_CSS/LR0.001BS10NS100RS0DATA0MF0_0316PM_June23_2017/'...
+    'TRAIN_IMAGES.dat'];
+
+train_images = load(path);
+
+x= train_images';
+
+[D, N] = size(x);
 
 % try to learn this:
 W=0.00000001*randn(D,D); W=0.5*(W+W');
