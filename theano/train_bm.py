@@ -7,6 +7,7 @@ Machine Learning
 """
 
 import numpy as np
+import subprocess
 import argparse
 import shutil
 import os
@@ -24,6 +25,10 @@ print("Importing data:")
 mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 
 report_step          = 1
+
+test_mode            = True
+
+save_images          = True
 
 test_add_complements = False
 
@@ -61,7 +66,11 @@ arg_parser.add_argument('--num_steps', type = str, required = False)
 
 arg_parser.add_argument('--mf_steps', type = str, required = False)
 
-arg_parser.add_argument('--num_data', type = str, required = False)
+arg_parser.add_argument('--data_samples', type = str, required = False)
+
+arg_parser.add_argument('--learn_subset', type = str, required = False)
+
+arg_parser.add_argument('--is_uniform', type = str, required = False)
 
 arg_parser.add_argument('--resample', type = str, required = False)
 
@@ -92,6 +101,26 @@ dir_name ="logs_%s"%algorithm
 print("Algorithm : %s"%algorithm)
 print("Experiment: %s"%experiment_tag)
 
+if FLAGS.learn_subset != None:
+    
+   num_learn = int(FLAGS.learn_subset)
+
+   print("Will train on only %d randomly selected images"%num_learn)
+   
+   train_inds   = np.random.choice(range(N_train), 
+                                   num_learn,
+                                   replace=False)
+   
+   train_images = train_images[train_inds,:]
+   
+   N_train      = num_learn
+   
+   assert batch_size <= num_learn
+
+else:
+    
+   num_learn = None
+   
 if algorithm == "CD1":
     
    assert FLAGS.num_steps != None 
@@ -107,28 +136,30 @@ if algorithm == "CD1":
    
    num_samples = None 
    
-   num_data    = None
+   data_samples    = None
    
    resample    = None
    
+   is_uniform  = False
+   
 if algorithm   == "CSS":
    
-   assert FLAGS.num_samples != None
+   assert FLAGS.num_samples  != None
    
-   assert FLAGS.num_data    != None
+   assert FLAGS.data_samples != None
     
    num_cd_steps   = None
    
    num_samples    = int(FLAGS.num_samples)
    
-   num_data       = int(FLAGS.num_data)
+   data_samples   = int(FLAGS.data_samples)
    
    if num_samples ==0:
    
       specs = (str(learning_rate),
                batch_size,
                num_samples,
-               num_data,
+               data_sampples,
                datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" ))
    
       exp_tag = "LR%sBS%dNS%dDATA%d_%s"%specs
@@ -137,7 +168,13 @@ if algorithm   == "CSS":
       
       mf_steps = 0
       
+   is_uniform = False
+      
    if num_samples > 0:
+       
+      if FLAGS.is_uniform != None:
+          
+         is_uniform = bool(int(FLAGS.is_uniform))
        
       if FLAGS.mf_steps != None:
           
@@ -155,7 +192,7 @@ if algorithm   == "CSS":
                batch_size,
                num_samples,
                resample,
-               num_data,
+               data_samples,
                mf_steps,
                datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" ))
    
@@ -182,9 +219,11 @@ bm = BoltzmannMachine(num_vars        = input_dim,
                       learning_rate   = learning_rate,
                       num_samples     = num_samples,
                       num_cd_steps    = num_cd_steps,
-                      num_data        = num_data,
+                      data_samples    = data_samples,
                       unique_samples  = resample,
-                      mf_steps        = mf_steps)
+                      is_uniform      = is_uniform,
+                      mf_steps        = mf_steps,
+                      test_mode       = test_mode)
                       
 if test_add_complements:
     
@@ -201,7 +240,7 @@ if test_add_complements:
    
    sys.exit()
    
-if test_comp_energies:
+elif test_comp_energies:
     
    print("Testing mode")
    minibatch_inds = range(batch_size)
@@ -210,17 +249,17 @@ if test_comp_energies:
    
    test_function = bm.test_compute_energy()
    
-   if num_data < N_train:
+   if data_samples < N_train:
    
-      print("Need to compute energies of %d terms"%(batch_size*num_data))
+      print("Need to compute energies of %d terms"%(batch_size*data_samples))
    
-      assert len(sampled_indices) == batch_size*num_data
+      assert len(sampled_indices) == batch_size*data_samples
       
-   if num_data == N_train:
+   if data_samples == N_train:
        
-      print("Need to compute energies of %d terms"%(num_data))
+      print("Need to compute energies of %d terms"%(data_samples))
    
-      assert len(sampled_indices) == num_data
+      assert len(sampled_indices) == data_samples
    
    t0 = timeit.default_timer()
    
@@ -231,20 +270,34 @@ if test_comp_energies:
    print("Computation took --- %f minutes"%((t1 - t0)/60.0))
    
    sys.exit()
+   
+elif test_mode:
+    
+   print("Testing mode")
+   cd_sampling, optimize = bm.add_graph()
+   
     
 else:
     
    print("Training mode")
    cd_sampling, optimize = bm.add_graph()
-    
+   
    exp_path = os.path.join(dir_name,exp_tag)
         
    os.makedirs(exp_path)
    
-if save_init_weights:
+   if FLAGS.learn_subset != None:
     
-   bm.save_model_params(os.path.join(exp_path,"INIT_PARAMS.model"))
-   print("saved initial weights of fully visible Boltzmann Machine")
+      np.savetxt(os.path.join(exp_path,"LEARNT_INSTANCES.dat"), train_inds)
+      
+   if save_images:
+      print("Saving training images")
+      np.savetxt(os.path.join(exp_path,"TRAIN_IMAGES.dat"), train_images)
+   
+   if save_init_weights:
+    
+      bm.save_model_params(os.path.join(exp_path,"INIT_PARAMS.model"))
+      print("saved initial weights of fully visible Boltzmann Machine")
    
 start_time = timeit.default_timer()
 
@@ -264,10 +317,10 @@ for epoch_index in range(num_epochs):
         
         if algorithm =="CSS":
            
-           if num_samples > 0:
+           if (num_samples > 0) and (is_uniform != True):
                
               if bool(mf_steps):
-              
+                 print("Updating MF parameters")
                  mf_t0 = timeit.default_timer()
               
                  bm.do_mf_updates(num_steps = mf_steps)
@@ -286,12 +339,40 @@ for epoch_index in range(num_epochs):
               
                  bm.mf_params.set_value(reinit_mf)
               
-           sampled_indices = bm.select_data(minibatch_inds)
-           
            opt_t0 = timeit.default_timer()
            ###
-           approx_minibatch_cost = optimize(sampled_indices, 
-                                            list(minibatch_inds))
+           if data_samples > 0:
+               
+              sampled_indices = bm.select_data(minibatch_inds)
+              
+              approx_minibatch_cost = optimize(sampled_indices, 
+                                               list(minibatch_inds))
+           if data_samples ==0 and is_uniform:
+               
+              is_samples = bm.np_rand_gen.binomial(n=1,p=0.5, 
+              size = (bm.num_samples, bm.num_vars))
+              
+              is_samples = np.asarray(is_samples, dtype = theano.config.floatX)
+              
+              approx_minibatch_cost = optimize(is_samples, list(minibatch_inds))
+              
+              if test_mode:
+                  
+                 W_implicit = bm.W.get_value()
+              
+                 b_implicit = bm.b.get_value()
+                  
+                 bm.test_grad_computations(is_samples, list(minibatch_inds))
+                 
+                 W_explicit = bm.W.get_value()
+              
+                 b_explicit = bm.b.get_value()
+                 
+                 print("Equivalence of W updates in two implementations:")
+                 print((W_implicit == W_explicit).all())
+                 print("Equivalence of b updates in two implementations:")
+                 print((b_implicit == b_explicit).all())
+                 sys.exit()
            ###
            opt_t1 = timeit.default_timer()
            print("Optimization step took --- %f minutes"%
@@ -339,6 +420,29 @@ print('Training took %f minutes'%training_time)
 np.savetxt(os.path.join(exp_path,"TRAIN_LOSSES.dat"), losses)
 
 np.savetxt(os.path.join(exp_path,"TRAINING_TIME.dat"), np.array([training_time]))
+
+if algorithm == "CSS":
+
+   if (FLAGS.learn_subset != None) and (num_learn > 0):
+
+      for file_tag in ['INIT','TRAINED']:
+          
+          if file_tag == 'TRAINED':
+              
+             print("Testing trained model")
+             
+          if file_tag == 'INIT':
+              
+            print("Testing initialized model")
+
+          command_string =("python test_bm.py "+\
+          "--path_to_params %s/%s_PARAMS.model "+\
+          "--num_samples 8 --num_chains %d --trained_subset 1 --num_steps 1")\
+          %(exp_path,file_tag, num_learn)
+
+          subprocess.call(command_string ,shell=True)
+
+
     
     
     

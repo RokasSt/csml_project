@@ -8,20 +8,24 @@ class Experiments(object):
     
   """ Add parameters of the experiments here """
     
-  exp1 ={'num_epochs':      '15',
-         'batch_size':      '50',
-         'learning_rate':   '0.05',
+  exp1 ={'num_epochs':      '200',
+         'batch_size':      '2',
+         'learning_rate':   '0.1',
          'experiment'   :   'exp1_CSS',
-         'num_data'     :   '500', # 500 samples form training set
-         'num_samples'  :   '0',
+         'data_samples' :   '0', # 0 means, that only minibatch points
+         # will contribute to the data term of Z approximation.
+         'num_samples'  :   '10000',
+         'resample'     :   '0',
+         'is_uniform'   :   '1',
          'algorithm'    :   'CSS',
-         'use_gpu'      :   '1'}
+         'use_gpu'      :   '0', #'1'
+         'learn_subset' :   '2'}
          
   exp2 ={'num_epochs':      '15',
          'batch_size':      '50',
          'learning_rate':   '0.05',
          'experiment':      'exp2_CSS',
-         'num_data'   :     '55000',# a whole training set is used to approx. Z
+         'data_samples':     '55000',# a whole training set is used to approx. Z
          'num_samples':     '0',
          'algorithm'  :     'CSS',
          'use_gpu'    :     '1'}
@@ -30,7 +34,7 @@ class Experiments(object):
          'batch_size':      '50',
          'learning_rate':   '0.05',
          'experiment'   :   'exp1_CSS_MF',
-         'num_data'     :   '55000',
+         'data_samples' :   '55000',
          'num_samples'  :   '1000',
          'mf_steps'     :   '0',
          'resample'     :   '0',# whether to resample for each minibatch instance if num_samples != 0
@@ -41,7 +45,7 @@ class Experiments(object):
          'batch_size':      '50',
          'learning_rate':   '0.05',
          'experiment'   :   'exp2_CSS_MF',
-         'num_data'     :   '5000',
+         'data_samples' :   '5000',
          'num_samples'  :   '5000',
          'resample'     :   '1',
          'algorithm'    :   'CSS',

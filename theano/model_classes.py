@@ -23,17 +23,19 @@ class BoltzmannMachine(object):
     
     def __init__(self, 
                  num_vars, 
-                 training_inputs,
-                 algorithm,
-                 batch_size,
-                 learning_rate,
-                 num_samples,
-                 num_cd_steps,
-                 num_data,
-                 unique_samples,
-                 mf_steps,
+                 training_inputs = None,
+                 algorithm = None,
+                 batch_size = None,
+                 learning_rate = None,
+                 num_samples = None,
+                 num_cd_steps = None,
+                 data_samples = None,
+                 unique_samples = None,
+                 is_uniform   = None,
+                 mf_steps = None,
                  W= None, 
                  b= None, 
+                 test_mode= False,
                  training = True):
         
         """ Constructor for Boltzmann Machine
@@ -44,21 +46,23 @@ class BoltzmannMachine(object):
         
         """
         
-        self.num_vars    = num_vars
+        self.num_vars       = num_vars
         
-        self.batch_size  = batch_size
+        self.batch_size     = batch_size
         
-        self.learning_rate = learning_rate
+        self.learning_rate  = learning_rate
         
-        self.num_samples = num_samples
+        self.num_samples    = num_samples
         
         self.num_cd_steps   = num_cd_steps
         
-        self.num_data    = num_data
+        self.data_samples   = data_samples
         
         self.unique_samples = unique_samples
         
-        self.mf_steps   = mf_steps
+        self.mf_steps       = mf_steps
+        
+        self.is_uniform     = is_uniform
         
         self.side = int(np.sqrt(self.num_vars))
         
@@ -80,44 +84,56 @@ class BoltzmannMachine(object):
            
            self.N_train = training_inputs.shape[0]
            
-           assert self.N_train == 55000
-           
            self.train_inputs = theano.shared(np.asarray(training_inputs,
                                           dtype=theano.config.floatX),
                                           borrow= True)
                                           
-           if W is None:
+           if test_mode:
+              
+              b = np.ones(self.num_vars, dtype = theano.config.floatX)
         
-              uniform_init = self.np_rand_gen.uniform(-np.sqrt(3.0/num_vars),\
-              np.sqrt(3.0 / num_vars), size = (num_vars, num_vars) )
+              W = np.ones([self.num_vars, self.num_vars], 
+                          dtype = theano.config.floatX)
         
-              W0 = np.asarray(uniform_init, dtype = theano.config.floatX)
-              
-              W0 = (W0 + np.transpose(W0))/2.0
-              
-              W0 = W0 - np.diag(np.diag(W0))
+              self.b = theano.shared(b, name='b', borrow = True)
         
-              self.W = theano.shared(value= W0, name='W', borrow=True)
-              
-              test_W = self.W.get_value() 
-              
-              assert sum(np.diag(test_W)) == 0.0
-              
-              assert (test_W == np.transpose(test_W)).all() == True
-              
+              self.W = theano.shared(W, name='W', borrow = True)
+              print("Initialized with test mode")
            else:
-            
-              self.W = W
-           
-           if b is None:
+                                          
+              if W is None:
         
-              bias_init = np.zeros(num_vars, dtype = theano.config.floatX)
+                 uniform_init =\
+                 self.np_rand_gen.uniform(-np.sqrt(3.0/(num_vars)),\
+                 np.sqrt(3.0 / (num_vars)), size = (num_vars, num_vars))
         
-              self.b = theano.shared(value= bias_init, name='b', borrow=True)
-           
-           else:
+                 W0 = np.asarray(uniform_init, dtype = theano.config.floatX)
+              
+                 W0 = (W0 + np.transpose(W0))/2.0
+              
+                 W0 = W0 - np.diag(np.diag(W0))
+        
+                 self.W = theano.shared(value= W0, name='W', borrow=True)
+              
+                 test_W = self.W.get_value() 
+              
+                 assert sum(np.diag(test_W)) == 0.0
+              
+                 assert (test_W == np.transpose(test_W)).all() == True
+              
+              else:
             
-              self.b = b
+                 self.W = W
+           
+              if b is None:
+        
+                 bias_init = np.zeros(num_vars, dtype = theano.config.floatX)
+        
+                 self.b = theano.shared(value= bias_init, name='b', borrow=True)
+           
+              else:
+            
+                 self.b = b
            
            self.theta           = [self.W, self.b]
         
@@ -137,8 +153,8 @@ class BoltzmannMachine(object):
                                           dtype=theano.config.floatX),
                                           borrow = True, name= "x_gibbs")
               
-           if (self.algorithm == "CSS") and (self.num_samples >0):
-               
+           if (self.algorithm == "CSS") and (self.is_uniform  != True):
+              
               init_mf = self.np_rand_gen.uniform(0,1, 
               size = (self.num_vars, self.num_samples))
               
@@ -147,7 +163,7 @@ class BoltzmannMachine(object):
               self.mf_params = theano.shared(init_mf, 
                                              name= "mf_params", 
                                              borrow= True)
-           
+    
     def energy_function(self, x):
     
         """ to compute energy function for fully visible Boltzmann machine
@@ -169,6 +185,70 @@ class BoltzmannMachine(object):
   
         return -T.dot(T.transpose(x), T.dot(self.W, x)) - T.dot(T.transpose(self.b), x)
         
+    def add_mf_approximation(self):
+        
+        """ function to add mf approximation of energy terms in Z"""
+        
+        if self.unique_samples:
+               
+           print("Samples will be drawn for each instance in a minibatch")
+           [list_mf_samples, weight_term], updates =\
+           theano.scan(self.get_mf_samples, n_steps = self.batch_size)
+         
+           self.updates.update(updates)
+         
+           list_mf_samples = theano.gradient.disconnected_grad(list_mf_samples)
+        
+           weight_term    = theano.gradient.disconnected_grad(weight_term)
+        
+           weight_term    = T.log(self.num_samples*weight_term)
+        
+           approx_Z_mf, updates = \
+           theano.scan(lambda i : -self.compute_energy(list_mf_samples[i],\
+           self.num_samples),sequences = [T.arange(self.batch_size)])
+        
+           self.updates.update(updates)
+        
+           weight_term   = T.reshape(weight_term,
+                                    [self.batch_size, self.num_samples])
+        
+           approx_Z_mf = T.reshape(approx_Z_mf,
+                                   [self.batch_size, self.num_samples])
+                                     
+           approx_Z_mf = approx_Z_mf - weight_term
+           
+        else:
+               
+           print("Samples will be shared between instances in a minibatch")
+              
+           mf_samples, weight_term = self.get_mf_samples()
+              
+           mf_samples  = theano.gradient.disconnected_grad(mf_samples)
+        
+           weight_term = theano.gradient.disconnected_grad(weight_term)
+        
+           weight_term = T.log(self.num_samples*weight_term)
+              
+           approx_Z_mf = -self.compute_energy(mf_samples, self.num_samples)
+              
+           approx_Z_mf = approx_Z_mf - weight_term
+           
+        return approx_Z_mf
+        
+    def add_is_uni_approximation(self):
+        
+        """ function to add computations of energies and their weights
+        in the approximating term in normalizer Z. Samples are obtained
+        using uniform importances sampling."""
+        
+        weight_term = T.log(self.num_samples) + self.num_vars*T.log(0.5)
+        
+        approx_Z = -self.compute_energy(self.x_tilda, self.num_samples)
+              
+        approx_Z = approx_Z - weight_term
+        
+        return approx_Z
+        
     def add_complementary_term(self):
         
         """ function to add computations on approximating term of log Z
@@ -179,60 +259,25 @@ class BoltzmannMachine(object):
         if self.num_samples > 0:
             
            non_data_samples = True
-        
-           if self.unique_samples:
-               
-              print("Samples will be drawn for each instance in a minibatch")
-              [list_mf_samples,list_inv_q_s], updates =\
-              theano.scan(self.get_mf_samples, n_steps = self.batch_size)
-         
-              self.updates.update(updates)
-         
-              list_mf_samples = theano.gradient.disconnected_grad(list_mf_samples)
-        
-              list_inv_q_s     = theano.gradient.disconnected_grad(list_inv_q_s)
-        
-              inv_q_s_S        = T.log(self.num_samples*list_inv_q_s)
-        
-              approx_Z_mf, updates = \
-              theano.scan(lambda i : -self.compute_energy(list_mf_samples[i],\
-              self.num_samples),sequences = [T.arange(self.batch_size)])
-        
-              self.updates.update(updates)
-        
-              inv_q_s_S   = T.reshape(inv_q_s_S,
-                                     [self.batch_size, self.num_samples])
-        
-              approx_Z_mf = T.reshape(approx_Z_mf,
-                                     [self.batch_size, self.num_samples])
-                                     
-              approx_Z_mf = approx_Z_mf - inv_q_s_S
            
+           if self.is_uniform:
+               
+              print("Will use uniform importance sampling for Z approximation")
+              
+              approx_Z = self.add_is_uni_approximation()
+              
            else:
-               
-              print("Samples will be shared between instances in a minibatch")
-              
-              mf_samples, inv_q_s = self.get_mf_samples()
-              
-              mf_samples  = theano.gradient.disconnected_grad(mf_samples)
-        
-              inv_q_s     = theano.gradient.disconnected_grad(inv_q_s)
-        
-              inv_q_s_S   = T.log(self.num_samples*inv_q_s)
-              
-              approx_Z_mf = -self.compute_energy(mf_samples, self.num_samples)
-              
-              approx_Z_mf = approx_Z_mf - inv_q_s_S
-        else:
-            
-           non_data_samples = False 
            
-        return approx_Z_mf, non_data_samples
+              print("Will use mean-field sampling for Z approximation")
+              
+              approx_Z = self.add_mf_approximation()
+           
+        return approx_Z, non_data_samples
         
     def compute_approx_log_Z(self, data_term, non_data_term, axis= None):
         
-        """ function to combine data-specific and non-data terms for
-        computating the approximation of log Z 
+        """ function to combine data-specific and non-data-specific 
+        energy terms for computating the approximation of log Z 
         """
         
         if (axis == 1) and (non_data_term != None):
@@ -252,11 +297,11 @@ class BoltzmannMachine(object):
            approx_Z = T.mean(approx_Z)
            
         if (axis == None) and (non_data_term != None):
-            
+           
            approx_Z = T.concatenate([non_data_term, data_term])
               
            max_val  = T.max(approx_Z)
-              
+           
            approx_Z = approx_Z - max_val
         
            approx_Z = max_val + T.log(T.sum(T.exp(approx_Z)))
@@ -275,7 +320,7 @@ class BoltzmannMachine(object):
 
            max_vals  = T.reshape(max_vals,[self.batch_size,1])
            
-           max_vals_tiled  = T.tile(max_vals,(1,self.num_data+1))
+           max_vals_tiled  = T.tile(max_vals,(1,self.data_samples+1))
            
            approx_Z = data_term - max_vals_tiled
         
@@ -290,28 +335,35 @@ class BoltzmannMachine(object):
         """ function to define complementary sum sampling (css) 
         approximation of log Z.
         
-        minibatch_evals - minibatch energy evaluations.
+        minibatch_evals - minibatch energy evaluations computed with
+        self.compute_energy().
         
         """
         
         approx_Z, non_data_samples = self.add_complementary_term()
+        
+        if self.data_samples == 0:
             
-        if self.num_data == self.N_train:
+           print("Will use minibatch set only for data term in Z approximation")
+           
+           approx_Z_data = -minibatch_evals
+            
+        if self.data_samples == self.N_train:
             
            print("Will explicitly include all training points in Z approximation")
            
            approx_Z_data = -self.compute_energy(self.x_tilda, self.N_train)
            
-        if (self.num_data < self.N_train):
+        if (self.data_samples < self.N_train) and (self.data_samples != 0):
             
            print("Will uniformly sample from training set for Z approximation")
            
            approx_Z_data = -self.compute_energy(self.x_tilda, 
-                                          self.batch_size*self.num_data)
+                                          self.batch_size*self.data_samples)
                                         
-           approx_Z_data = T.reshape(approx_Z_data, [self.batch_size, self.num_data])
+           approx_Z_data = T.reshape(approx_Z_data, [self.batch_size, self.data_samples])
            
-           approx_Z_data = approx_Z_data - T.log(self.num_data)
+           approx_Z_data = approx_Z_data - T.log(self.data_samples)
            
            minibatch_evals = -T.reshape(minibatch_evals, [self.batch_size,1])
            
@@ -321,33 +373,33 @@ class BoltzmannMachine(object):
            
            if self.unique_samples:
                
-              if self.num_data == self.N_train:
+              if self.data_samples == self.N_train:
               
                  approx_Z_data = T.tile(approx_Z_data,(self.batch_size,1))
                  
               approx_Z = self.compute_approx_log_Z(approx_Z_data, approx_Z, axis=1)
               
            else:
-               
-              if self.num_data  < self.N_train:
+              
+              if (self.data_samples  < self.N_train) and (self.data_samples != 0):
                  
                  approx_Z = T.tile(approx_Z,(self.batch_size,1))
                  
                  approx_Z = self.compute_approx_log_Z(approx_Z_data, approx_Z, axis=1)
                
-              if self.num_data == self.N_train:
+              if (self.data_samples == self.N_train) or (self.data_samples == 0):
                  
                  approx_Z = self.compute_approx_log_Z(approx_Z_data, approx_Z)
               
         else:
             
-           if self.num_data == self.N_train:
+           if self.data_samples == self.N_train:
                
               approx_Z = self.compute_approx_log_Z(approx_Z_data, 
                                                    non_data_term =None)
               
               
-           if self.num_data < self.N_train:
+           if (self.data_samples < self.N_train) and (self.data_samples !=0):
                
               approx_Z = self.compute_approx_log_Z(approx_Z_data,
                                                    non_data_term = None,
@@ -418,14 +470,14 @@ class BoltzmannMachine(object):
         
         """ test compute_energy() """
         
-        if self.num_data < self.N_train:
+        if self.data_samples < self.N_train:
         
            approx_Z_data = -self.compute_energy(self.x_tilda, 
-                                                self.batch_size*self.num_data)
+                                                self.batch_size*self.data_samples)
                                              
-        if self.num_data == self.N_train:
+        if self.data_samples == self.N_train:
             
-           approx_Z_data = -self.compute_energy(self.x_tilda, self.num_data)
+           approx_Z_data = -self.compute_energy(self.x_tilda, self.data_samples)
                                              
         input_dict = {self.x_tilda: self.train_inputs[self.sample_set,:]}
                                              
@@ -521,7 +573,7 @@ class BoltzmannMachine(object):
         ##  for now, complementary set is computed jointly;
         ##  uses naive approach, uniform sampling
         
-        if self.num_data < self.N_train:
+        if self.data_samples < self.N_train:
             
            data_samples = []
            
@@ -530,14 +582,14 @@ class BoltzmannMachine(object):
                compl_inds = list(self.train_set - set([minibatch_set[i]]))
             
                s = np.random.choice(compl_inds,
-                                    self.num_data, 
+                                    self.data_samples, 
                                     replace=False)
         
                data_samples.extend(list(s))
         
-           assert len(data_samples) == self.num_data*minibatch_size
+           assert len(data_samples) == self.data_samples*minibatch_size
            
-        if self.num_data == self.N_train:
+        if self.data_samples == self.N_train:
             
            data_samples = list(self.train_set)
         
@@ -580,12 +632,22 @@ class BoltzmannMachine(object):
         
         if self.algorithm =="CSS":
             
-           input_dict = {
-            self.x      : self.train_inputs[self.minibatch_set,:],
-            self.x_tilda: self.train_inputs[self.sample_set,:]
-           }
+           if self.data_samples > 0:
+            
+              input_dict = {
+               self.x      : self.train_inputs[self.minibatch_set,:],
+               self.x_tilda: self.train_inputs[self.sample_set,:]
+              }
            
-           var_list = [self.sample_set, self.minibatch_set]
+              var_list = [self.sample_set, self.minibatch_set]
+              
+           if (self.data_samples == 0) and self.is_uniform:
+               
+              input_dict = {
+               self.x      : self.train_inputs[self.minibatch_set,:]
+              }
+           
+              var_list = [self.x_tilda, self.minibatch_set]
            
         if self.algorithm =="CD1":
             
@@ -672,11 +734,143 @@ class BoltzmannMachine(object):
         optimize = self.optimization_step()
  
         return cd_sampling, optimize
+    
+    def relative_likelihood(self):
+    
+        """ function to compute relative, unnormalized likelihood 
+        of given examples"""
+        
+        return T.exp(-self.compute_energy(self.x, self.batch_size))
+        
+    def test_relative_probability(self, inputs, trained= True):
+        
+        """ function to test relative, unnormalized likelihood 
+        of given examples"""
+        
+        self.batch_size = inputs.shape[0]
+        
+        self.x = T.matrix('x')
+        
+        prob_op = self.relative_likelihood()
+        
+        test_function = theano.function(inputs=[self.x],
+                                        outputs=[prob_op])
+                                        
+        probs = test_function(inputs)
+        
+        if trained:
+           print("Relative likelihoods of training examples:")
+        else:
+           print("Relative likelihoods of random examples:")
+           
+        print(probs)
+        
+    def add_p_tilda(self):
+        
+        """ function to compute p_tilda for explicit
+         gradient computations"""
+        
+        minibatch_energies = -self.compute_energy(self.x, self.batch_size)
+        
+        sample_energies = self.add_is_uni_approximation()
+        
+        all_energies = T.concatenate([minibatch_energies, sample_energies])
+        
+        max_val = theano.gradient.disconnected_grad(T.max(all_energies))
+              
+        approx_Z = all_energies - max_val
+        
+        p_tilda = T.exp(approx_Z)
+        
+        self.p_tilda = p_tilda/ T.sum(T.exp(approx_Z))
+        
+    def xn_xn_prod(self,x_n):
+        
+        """ function to add computation of x(n)^T x(n);
+        x_n - is 1 x D vector """
+        
+        x_n_tiled =T.tile(x_n,(self.num_vars,1))
+        
+        return T.transpose(x_n_tiled)*x_n_tiled
+    
+    def test_grad_computations(self, samples, training_points):
+        
+        """ function to test gradient computations explicitly """
+        
+        self.add_p_tilda()
+        
+        do_updates = OrderedDict()
+        
+        b = np.ones(self.num_vars, 
+                    dtype = theano.config.floatX)
+        
+        W = np.ones([self.num_vars, self.num_vars], 
+                    dtype = theano.config.floatX)
+        
+        self.b.set_value(b)
+        
+        self.W.set_value(W)
+        
+        gradW = theano.shared(np.zeros([self.num_vars,self.num_vars]))
+        
+        gradb = theano.shared(np.zeros([self.num_vars]))
+        
+        [gradW, gradb], updates =\
+         theano.scan(lambda i, gradW, gradb: [gradW+ \
+        (1-self.batch_size*self.p_tilda[i])\
+        *self.xn_xn_prod(self.x[i,:]),
+        gradb+ \
+        (1-self.batch_size*self.p_tilda[i])\
+        *self.x[i,:]],
+        outputs_info =[gradW, gradb],
+        sequences =[T.arange(self.batch_size)])
+        
+        gradW = gradW[-1]
+        
+        gradb = gradb[-1]
+        
+        do_updates.update(updates)
+        
+        [gradW, gradb], updates = \
+        theano.scan(lambda i, gradW, gradb: [gradW - \
+        self.batch_size*self.p_tilda[self.batch_size+i]*\
+        self.xn_xn_prod(self.x_tilda[i,:]),
+        gradb-self.batch_size*self.p_tilda[self.batch_size+i]*\
+        self.x_tilda[i,:]],
+        outputs_info =[gradW, gradb],
+        sequences =[T.arange(self.num_samples)])
+        
+        gradW = gradW[-1] /self.batch_size
+        
+        gradb = gradb[-1] /self.batch_size
+        
+        gradW = gradW - T.diag(T.diag(gradW)) # no recurrent connections
+        
+        do_updates.update(updates)
+        
+        ## ML objective log likelihood:
+        
+        do_updates.update([(self.W, self.W + self.learning_rate*gradW)])
+        
+        do_updates.update([(self.b, self.b + self.learning_rate*gradb)])
+        
+        input_dict = {self.x: self.train_inputs[self.minibatch_set,:]}
+           
+        var_list = [self.x_tilda, self.minibatch_set]
+        
+        test_grads = theano.function(inputs = var_list,
+                                     outputs= [],
+                                     updates= do_updates,
+                                     givens = input_dict,
+                                     on_unused_input='warn')
+                                     
+        test_grads(samples, training_points)
         
     def sample_from_bm(self, 
                        test_inputs,
                        num_chains, 
                        num_samples,
+                       num_steps,
                        save_to_path):
         
         """ function to generate images from trained 
@@ -706,10 +900,11 @@ class BoltzmannMachine(object):
         theano.config.exception_verbosity = 'high'
         
         (p_xi_given_x_, x_samples), updates =\
-        theano.scan(self.gibbs_step_fully_visible, n_steps = 1)
+        theano.scan(self.gibbs_step_fully_visible, n_steps = num_steps)
         
         get_samples = theano.function(inputs  = [],
-                                      outputs = [p_xi_given_x_[0],x_samples[0]], 
+                                      outputs = [p_xi_given_x_[-1],
+                                      x_samples[-1]], 
                                       updates = updates)
                                       
         for ind in range(num_samples):
@@ -718,7 +913,8 @@ class BoltzmannMachine(object):
             
             self.x_gibbs.set_value(init_chains)     
             
-            images[num_chains*(ind+1):num_chains*(ind+2),:] = np.round(np.transpose(p_out))
+            images[num_chains*(ind+1):num_chains*(ind+2),:] = \
+            np.round(np.transpose(p_out))
         
         make_raster_plots(images, 
                           num_samples, 

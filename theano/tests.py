@@ -8,6 +8,7 @@ import theano.tensor as T
 import theano.sandbox.rng_mrg
 import numpy as np
 from   collections import OrderedDict
+import timeit
 
 class Test(object):
     
@@ -100,6 +101,35 @@ class Test(object):
                                                 
         return samples
         
+    def get_bin_samples(self):
+        
+        """ function to sample binary units """
+        
+        samples = self.theano_rand_gen.binomial(size= (784, 100000),
+                                                n   = 1, 
+                                                p   = 0.5,
+                                                dtype=theano.config.floatX)
+                                                
+        return samples
+        
+    def test_get_bin_samples(self):
+        
+        """ function to test get_bin_samples() """
+        
+        list_samples, updates  = theano.scan(self.get_bin_samples, n_steps =1)
+        
+        test_function = theano.function(inputs  = [],
+                                        outputs = list_samples,
+                                        updates = updates)
+        
+        t0 = timeit.default_timer()
+        
+        test_function()
+        
+        t1 = timeit.default_timer()
+        
+        print("Sampling took --- %f"%((t1-t0)/60.0))
+            
     def test_get_mf_samples(self):
         
         list_samples, updates = theano.scan(self.get_mf_samples, n_steps =2)
@@ -137,5 +167,7 @@ if __name__ == "__main__":
    to_test.test_givens_shared_to_shared()
    
    to_test.test_get_mf_samples()
+   
+   to_test.test_get_bin_samples()
    
 
