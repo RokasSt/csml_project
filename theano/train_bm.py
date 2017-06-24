@@ -199,8 +199,6 @@ if algorithm   == "CSS":
       exp_tag = "LR%sBS%dNS%dRS%dDATA%dMF%d_%s"%specs
       
       resample = bool(resample)
-      
-      learning_rate = (1.0/(1+num_epochs/100.))*learning_rate/batch_size
    
 num_iterations = N_train // batch_size
 
@@ -218,7 +216,6 @@ bm = BoltzmannMachine(num_vars        = input_dim,
                       training_inputs = train_images,
                       algorithm       = algorithm,
                       batch_size      = batch_size,
-                      learning_rate   = learning_rate,
                       num_samples     = num_samples,
                       num_cd_steps    = num_cd_steps,
                       data_samples    = data_samples,
@@ -309,6 +306,16 @@ for epoch_index in range(num_epochs):
     
     permuted_inds = np.random.permutation(N_train)
     
+    # put different learning_rate rules per epoch for now here:
+    
+    # lrate_epoch = (1.0/(1+num_epochs/100.))*learning_rate/batch_size
+      
+    lrate_epoch = (0.98**epoch_index)*learning_rate
+    
+    # lrate_epoch  = learning_rate
+    
+    print("Learning rate for epoch %d --- %f"%(epoch_index,lrate_epoch))
+    
     avg_cost_val = []
     
     for i in range(num_iterations):
@@ -348,22 +355,34 @@ for epoch_index in range(num_epochs):
               sampled_indices = bm.select_data(minibatch_inds)
               
               approx_minibatch_cost = optimize(sampled_indices, 
-                                               list(minibatch_inds))
+                                               list(minibatch_inds),
+                                               lrate_epoch)
            if data_samples ==0 and is_uniform:
                
-              is_samples = bm.np_rand_gen.binomial(n=1,p=0.5, 
-              size = (bm.num_samples, bm.num_vars))
+              if resample > 0:
+                 
+                 is_samples = bm.np_rand_gen.binomial(n=1,p=0.5, 
+                 size = (bm.num_samples*batch_size, bm.num_vars))
+                 
+              else:
+               
+                 is_samples = bm.np_rand_gen.binomial(n=1,p=0.5, 
+                 size = (bm.num_samples, bm.num_vars))
               
               is_samples = np.asarray(is_samples, dtype = theano.config.floatX)
               
               if not test_mode:
                   
-                 approx_minibatch_cost = optimize(is_samples, list(minibatch_inds))
+                 approx_minibatch_cost = optimize(is_samples,
+                                                  list(minibatch_inds),
+                                                  lrate_epoch)
                   
               else:
                       
                  t0 = timeit.default_timer()
-                 approx_minibatch_cost = optimize(is_samples, list(minibatch_inds))
+                 approx_minibatch_cost = optimize(is_samples, 
+                                                  list(minibatch_inds),
+                                                  lrate_epoch)
                  t1 = timeit.default_timer()
                  print("Gradient computation with implementation 1 took"+\
                  " --- %f minutes"%((t1 - t0)/60.0))
@@ -398,7 +417,8 @@ for epoch_index in range(num_epochs):
            
            bm.x_gibbs.set_value(np.transpose(cd_sample)) 
            
-           approx_minibatch_cost = optimize(list(minibatch_inds))
+           approx_minibatch_cost = optimize(list(minibatch_inds),
+                                            lrate_epoch)
         
         avg_cost_val.append(approx_minibatch_cost)
         

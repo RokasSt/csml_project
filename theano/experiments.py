@@ -8,14 +8,14 @@ class Experiments(object):
     
   """ Add parameters of the experiments here """
     
-  exp1 ={'num_epochs':      '1500',
+  exp1 ={'num_epochs':      '300',
          'batch_size':      '10',
-         'learning_rate':   '0.01',
+         'learning_rate':   '0.1',
          'experiment'   :   'exp1_CSS',
          'data_samples' :   '0', # 0 means that only minibatch points
                 #will contribute to the data term of Z approximation.
-         'num_samples'  :   '5000',
-         'resample'     :   '0',
+         'num_samples'  :   '2000',
+         'resample'     :   '1',  # '0' - do not resample for each minibatch point.
          'is_uniform'   :   '1',
          'algorithm'    :   'CSS',
          'use_gpu'      :   '0', #'1'

@@ -26,7 +26,6 @@ class BoltzmannMachine(object):
                  training_inputs = None,
                  algorithm = None,
                  batch_size = None,
-                 learning_rate = None,
                  num_samples = None,
                  num_cd_steps = None,
                  data_samples = None,
@@ -49,8 +48,6 @@ class BoltzmannMachine(object):
         self.num_vars       = num_vars
         
         self.batch_size     = batch_size
-        
-        self.learning_rate  = learning_rate
         
         self.num_samples    = num_samples
         
@@ -87,6 +84,8 @@ class BoltzmannMachine(object):
            self.train_inputs = theano.shared(np.asarray(training_inputs,
                                           dtype=theano.config.floatX),
                                           borrow= True)
+                                          
+           self.learning_rate  = T.dscalar('learning_rate')
                                           
            if test_mode:
               
@@ -192,12 +191,12 @@ class BoltzmannMachine(object):
     
         - xTWx - bT x 
     
-        as a symbolic variable to add to the theano
-        computational graph.
+        as a symbolic variable to add to the theano computational graph.
     
         """
   
-        return -T.dot(T.transpose(x), T.dot(self.W, x)) - T.dot(T.transpose(self.b), x)
+        return -T.dot(T.transpose(x), T.dot(self.W, x)) -\
+         T.dot(T.transpose(self.b), x)
         
     def add_mf_approximation(self):
         
@@ -257,9 +256,21 @@ class BoltzmannMachine(object):
         
         weight_term = T.log(self.num_samples) + self.num_vars*T.log(0.5)
         
-        approx_Z = -self.compute_energy(self.x_tilda, self.num_samples)
+        if self.unique_samples:
+           
+           approx_Z = -self.compute_energy(self.x_tilda, 
+                                           self.num_samples*self.batch_size)
+           
+        else:
+            
+           approx_Z = -self.compute_energy(self.x_tilda, 
+                                           self.num_samples)
               
         approx_Z = approx_Z - weight_term
+        
+        if self.unique_samples:
+           
+           approx_Z = T.reshape(approx_Z, [self.batch_size, self.num_samples])
         
         return approx_Z
         
@@ -291,18 +302,25 @@ class BoltzmannMachine(object):
     def compute_approx_log_Z(self, data_term, non_data_term, axis= None):
         
         """ function to combine data-specific and non-data-specific 
-        energy terms for computating the approximation of log Z 
+        energy terms for computating the approximation of log Z. 
         """
         
         if (axis == 1) and (non_data_term != None):
-        
+           
            approx_Z = T.concatenate([non_data_term, data_term], axis=1)
               
            max_vals = T.max(approx_Z, axis=1)
 
            max_vals = T.reshape(max_vals,[self.batch_size,1])
            
-           max_vals_tiled= T.tile(max_vals,(1,self.num_samples+1))
+           if self.is_uniform:
+              
+              max_vals_tiled = T.tile(max_vals,
+                                      (1,self.num_samples+self.batch_size))
+               
+           else:
+           
+              max_vals_tiled= T.tile(max_vals,(1,self.num_samples+1))
            
            approx_Z = approx_Z - max_vals_tiled
         
@@ -387,8 +405,8 @@ class BoltzmannMachine(object):
            
            if self.unique_samples:
                
-              if self.data_samples == self.N_train:
-              
+              if (self.data_samples == self.N_train) or (self.data_samples ==0):
+            
                  approx_Z_data = T.tile(approx_Z_data,(self.batch_size,1))
                  
               approx_Z = self.compute_approx_log_Z(approx_Z_data, approx_Z, axis=1)
@@ -552,7 +570,7 @@ class BoltzmannMachine(object):
                                       
         return get_samples
                                     
-    def add_grad_updates(self, lrate):
+    def add_grad_updates(self):
         
         """  compute and collect gradient updates to dictionary
         
@@ -568,7 +586,7 @@ class BoltzmannMachine(object):
                grad = grad - T.diag(T.diag(grad)) # no x i - xi connections
                # for all i = 1, ..., D
                
-            self.updates[target_param] = target_param - lrate*grad
+            self.updates[target_param] = target_param - self.learning_rate*grad
             
             ## or T.cast(lrate, dtype = theano.config.floatX) to 
             ## guarantee compatibility with GPU
@@ -671,6 +689,8 @@ class BoltzmannMachine(object):
             
            var_list = [self.minibatch_set]
            
+        var_list.append(self.learning_rate)
+           
         opt_step = theano.function(inputs = var_list,
                                    outputs=self.pseudo_cost,
                                    updates=self.updates,
@@ -741,7 +761,7 @@ class BoltzmannMachine(object):
            
         self.add_objective()
 
-        self.add_grad_updates(self.learning_rate)   
+        self.add_grad_updates()   
 
         self.add_pseudo_cost_measure()
 
@@ -867,7 +887,7 @@ class BoltzmannMachine(object):
         
         input_dict = {self.x: self.train_inputs[self.minibatch_set,:]}
            
-        var_list = [self.x_tilda, self.minibatch_set]
+        var_list = [self.x_tilda, self.minibatch_set, self.learning_rate]
         
         test_grads = theano.function(inputs = var_list,
                                      outputs= [],

@@ -73,7 +73,7 @@ if bool(trained_subset):
     
    indices =np.loadtxt(os.path.join(split_path[0],"LEARNT_INSTANCES.dat"))
    
-   indices = np.asarray(indices, dtype = np.int)
+   indices = np.asarray(indices, dtype = np.int64)
    
    test_inputs = train_images[indices,:]
    
