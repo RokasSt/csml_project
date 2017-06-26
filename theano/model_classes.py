@@ -16,6 +16,7 @@ import sys
 from   utils import make_raster_plots
 from   collections import OrderedDict
 import timeit
+import os
 
 class BoltzmannMachine(object):
     
@@ -35,6 +36,7 @@ class BoltzmannMachine(object):
                  use_momentum = None,
                  W= None, 
                  b= None, 
+                 report_p_tilda =False,
                  test_mode= False,
                  training = True):
         
@@ -63,6 +65,8 @@ class BoltzmannMachine(object):
         self.is_uniform     = is_uniform
         
         self.use_momentum   = use_momentum
+        
+        self.report_p_tilda = report_p_tilda
         
         self.side = int(np.sqrt(self.num_vars))
         
@@ -351,9 +355,11 @@ class BoltzmannMachine(object):
            
            max_val  = T.max(approx_Z)
            
-           approx_Z = approx_Z - max_val
+           ### self. added to enable reporting p_tilda instead of
+           ### pseudo likelihood cost
+           self.approx_Z = approx_Z - max_val
         
-           approx_Z = max_val + T.log(T.sum(T.exp(approx_Z)))
+           approx_Z = max_val + T.log(T.sum(T.exp(self.approx_Z)))
            
         if (non_data_term == None) and (axis == None):
             
@@ -474,7 +480,8 @@ class BoltzmannMachine(object):
         
         """ function to sample from mean-field distribution """
         
-        samples = self.theano_rand_gen.binomial(size= (self.num_vars,self.num_samples),
+        samples = self.theano_rand_gen.binomial(size= (self.num_vars,
+                                                       self.num_samples),
                                                 n   = 1, 
                                                 p   = self.mf_params,
                                                 dtype=theano.config.floatX)
@@ -488,22 +495,38 @@ class BoltzmannMachine(object):
         """ function to add mean-field updates"""
         
         self.mf_updates, _ = theano.scan(lambda i: self.sigmoid_output(self.mf_params,i),
-                                   sequences = [T.arange(self.num_vars)])
+                                         sequences = [T.arange(self.num_vars)])
                                    
-    def do_mf_updates(self, num_steps):
+    def do_mf_updates(self, num_steps, report = False):
         
         """ function to implement mean-field updates for approximation
         of data distribution"""
         
-        updates = self.add_mf_updates()
+        output_vars =[]
         
-        update_funct = theano.function(inputs=[],
-                                       outputs=[],
-                                       updates = [(self.mf_params, self.mf_updates)])
-        
+        if report:
+            
+           mean_mf_params = T.mean(T.log(self.mf_params))
+           
+           output_vars.append(mean_mf_params)
+           
+        update_funct = theano.function(inputs  =[],
+                                       outputs = output_vars,
+                                       updates = [(self.mf_params,\
+                                       self.mf_updates)])
+                                       
         for step in range(num_steps):
             
-            update_funct()
+            if report:
+               
+               avg_log_mf = update_funct() 
+               
+               print("Step %d: average value of MF parameter --- %f"%
+               (step, avg_log_mf[0]))
+               
+            else:
+            
+               update_funct()
             
     def compute_energy(self, x, num_terms):
         
@@ -655,6 +678,15 @@ class BoltzmannMachine(object):
         
         return data_samples  
         
+    def add_approximate_likelihoods(self):
+        
+        """ function to define approximate likelihoods (p_tilda) 
+        for progress tracking"""
+        
+        p_tilda = T.exp(self.approx_Z)
+        
+        self.p_tilda = p_tilda/ T.sum(p_tilda)
+        
     def add_pseudo_cost_measure(self):
         
         """adds stochastic approximation to the cost objective;
@@ -723,10 +755,20 @@ class BoltzmannMachine(object):
             
            var_list.append(self.momentum)
            
-        opt_step = theano.function(inputs = var_list,
-                                   outputs=self.pseudo_cost,
-                                   updates=self.updates,
-                                   givens = input_dict,
+        output_vars = [self.pseudo_cost]
+        
+        if self.report_p_tilda:
+            
+           output_vars.append(self.p_tilda)
+           
+        else:
+            
+           output_vars.append(T.shared(0))
+           
+        opt_step = theano.function(inputs  = var_list,
+                                   outputs = output_vars,
+                                   updates = self.updates,
+                                   givens  = input_dict,
                                    on_unused_input='warn')
         
         return opt_step
@@ -793,8 +835,12 @@ class BoltzmannMachine(object):
            
         self.add_objective()
 
-        self.add_grad_updates()   
-
+        self.add_grad_updates()  
+        
+        if self.report_p_tilda:
+            
+           self.add_p_tilda()
+    
         self.add_pseudo_cost_measure()
 
         optimize = self.optimization_step()
@@ -929,6 +975,80 @@ class BoltzmannMachine(object):
                                      
         test_grads(samples, training_points)
         
+    def sample_from_mf_approx(self, 
+                              num_chains, 
+                              num_samples,
+                              num_steps,
+                              save_to_path,
+                              test_inputs    = None,
+                              save_mf_params = True):
+        
+        """ function to sample from mean-field approximation of trained
+        fully visible Boltzmann Machine."""
+        
+        images = np.zeros([num_chains*num_samples, self.num_vars])
+        
+        self.num_samples = num_chains
+        
+        if type(test_inputs) is  np.ndarray:
+           print("Will initialize MF parameters with input images") 
+           init_mf = np.transpose(test_inputs)
+            
+        else:
+        
+           print("Will initialize MF parameters with uniform distribution")
+           init_mf = self.np_rand_gen.uniform(0,1, 
+           size = (self.num_vars, self.num_samples))
+              
+        init_mf = np.asarray(init_mf, dtype = theano.config.floatX)
+              
+        self.mf_params = theano.shared(init_mf, 
+                                       name= "mf_params", 
+                                       borrow= True)
+                                       
+        self.add_mf_updates()
+        
+        self.do_mf_updates(num_steps = num_steps, report = True)
+        
+        if save_mf_params:
+            
+           split_path   = os.path.split(save_to_path)
+           
+           mf_file = os.path.join(split_path[0], "MF_PARAMS.model")
+           
+           print("Saving MF parameters to %s"%mf_file)
+           
+           mf_file = file(mf_file, 'wb')
+           
+           cPickle.dump(self.mf_params, 
+                        mf_file, 
+                        protocol=cPickle.HIGHEST_PROTOCOL)
+        
+           mf_file.close()
+        
+        mf_samples, sample_probs = self.get_mf_samples()
+        
+        get_samples = theano.function(inputs  = [],
+                                      outputs = [sample_probs, 
+                                                 mf_samples,
+                                                 self.mf_params])
+                                      
+        print("Sampling")      
+                                
+        for ind in range(num_samples):
+            
+            p_out, samples_out, mf_vals = get_samples()
+            
+            images[num_chains*ind:num_chains*(ind+1),:] = samples_out
+            #np.round(np.transpose(mf_vals))
+        
+        make_raster_plots(images, 
+                          num_samples, 
+                          num_chains, 
+                          reshape_to = [self.side, self.side], 
+                          save_to_path = save_to_path,
+                          test_images = False)    
+    
     def sample_from_bm(self, 
                        test_inputs,
                        num_chains, 
@@ -946,7 +1066,7 @@ class BoltzmannMachine(object):
         
         self.num_test_examples = test_inputs.shape[0]
         
-        images = np.zeros([num_chains*num_samples + num_chains, self.num_vars])
+        images = np.zeros([num_chains*num_samples+num_chains, self.num_vars])
         
         select_examples = np.random.choice(self.num_test_examples, 
                                            num_chains, 
@@ -974,7 +1094,7 @@ class BoltzmannMachine(object):
             
             p_out, samples_out = get_samples()
             
-            self.x_gibbs.set_value(init_chains)     
+            #self.x_gibbs.set_value(init_chains)     
             
             images[num_chains*(ind+1):num_chains*(ind+2),:] = \
             np.round(np.transpose(p_out))

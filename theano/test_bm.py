@@ -55,6 +55,8 @@ arg_parser.add_argument('--trained_subset', type = str, required = True)
 
 arg_parser.add_argument('--num_steps', type = str, required = True)
 
+arg_parser.add_argument('--use_mf_sampler', type = str, required = True)
+
 FLAGS, _         = arg_parser.parse_known_args()
 
 path_to_params   = FLAGS.path_to_params
@@ -66,6 +68,9 @@ num_chains       = int(FLAGS.num_chains)
 trained_subset   = int(FLAGS.trained_subset)
 
 num_steps        = int(FLAGS.num_steps)
+
+mf_sampler    = bool(int(FLAGS.use_mf_sampler)) # alternatively, sample
+# from mean-field approximation
 
 split_path       = os.path.split(path_to_params)
 
@@ -84,14 +89,26 @@ if bool(trained_subset):
 else:
     
    test_inputs = test_images
-   
-if "INIT" in split_path[1]:
+
+filename = "samples"
+
+if mf_sampler:
     
-   save_to_path = os.path.join(split_path[0],"samples_init.jpeg")
+   filename+="_mf"
    
 else:
     
-   save_to_path = os.path.join(split_path[0],"samples.jpeg")
+   filename+="_gibbs"
+   
+if "INIT" in split_path[1]:
+    
+   filename+="_init"
+    
+   save_to_path = os.path.join(split_path[0],filename+".jpeg")
+   
+else:
+    
+   save_to_path = os.path.join(split_path[0],filename+".jpeg")
 
 bm = BoltzmannMachine(num_vars        = input_dim, 
                       training        = False)
@@ -115,13 +132,25 @@ if bool(trained_subset):
                              dtype = theano.config.floatX)
 
    bm.test_relative_probability(inputs = rand_samples, trained = False)
+   
+if mf_sampler:
 
-bm.sample_from_bm(test_inputs  = test_inputs,
-                  num_chains   = num_chains, 
-                  num_samples  = num_samples,
-                  num_steps    = num_steps,
-                  save_to_path = save_to_path)
-                   
+   bm.sample_from_mf_approx(num_chains   = num_chains, 
+                            num_samples  = num_samples,
+                            num_steps    = num_steps,
+                            save_to_path = save_to_path,
+                            test_inputs  = test_inputs,
+                            save_mf_params = True)
+    
+    
+else:
+
+   bm.sample_from_bm(test_inputs  = test_inputs,
+                     num_chains   = num_chains, 
+                     num_samples  = num_samples,
+                     num_steps    = num_steps,
+                     save_to_path = save_to_path)
+                    
 end_time = timeit.default_timer()
                    
 print('Image generation took %f minutes'%((end_time - start_time)/60.))

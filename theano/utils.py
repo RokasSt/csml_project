@@ -58,7 +58,12 @@ def compute_class_ratios(dataset_labels):
     
     return counts / float(num_instances)
     
-def make_raster_plots(images, num_samples, num_chains, reshape_to, save_to_path):
+def make_raster_plots(images, 
+                      num_samples, 
+                      num_chains, 
+                      reshape_to, 
+                      save_to_path,
+                      test_images = True):
     
     """ function to generate a raster of image plots 
     
@@ -78,9 +83,18 @@ def make_raster_plots(images, num_samples, num_chains, reshape_to, save_to_path)
 
     num_cols =  num_chains
     
-    assert images.shape[0] == num_rows*num_cols + num_cols
+    if test_images:
+    
+       assert images.shape[0] == num_rows*num_cols + num_cols
+       
+       num_rows = num_rows +1
+       
+    else:
+        
+       assert images.shape[0] == num_rows*num_cols
 
-    _, ax = plt.subplots(num_rows+1, num_cols, sharex=False , figsize=  (3 * num_cols, 3 * num_rows) )
+    _, ax = plt.subplots(num_rows, num_cols, sharex=False ,\
+    figsize=  (3 * num_cols, 3 * num_rows) )
     
     ax = ax.ravel()
     
@@ -90,16 +104,24 @@ def make_raster_plots(images, num_samples, num_chains, reshape_to, save_to_path)
     
     for image_index in range(images.shape[0]):
         
-        if image_index <= num_chains-1:
+        if test_images:
         
-           ax[plot_index].set_title("Test image %d"%(chain_index), size = 13)
+           if image_index <= num_chains-1:
+        
+              ax[plot_index].set_title("Test image %d"%(chain_index), size = 13)
            
-           chain_index +=1
+              chain_index +=1
            
-        if (image_index >= num_chains) and (image_index < 2*num_chains):
+           if (image_index >= num_chains) and (image_index < 2*num_chains):
             
-           ax[plot_index].set_title("Samples", size = 13)
-               
+              ax[plot_index].set_title("Samples", size = 13)
+              
+        else:
+            
+           if image_index <= num_chains-1:
+        
+              ax[plot_index].set_title("Samples", size = 13)
+           
         ax[plot_index].imshow(np.reshape(images[image_index,:], reshape_to))
                
         ax[plot_index].set_xticks([])

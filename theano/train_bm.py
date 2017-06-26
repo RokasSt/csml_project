@@ -108,7 +108,7 @@ print("Experiment: %s"%experiment_tag)
 if FLAGS.learn_subset != None:
     
    num_learn = int(FLAGS.learn_subset)
-
+   
    print("Will train on only %d randomly selected images"%num_learn)
    
    train_inds   = np.random.choice(range(N_train), 
@@ -120,7 +120,7 @@ if FLAGS.learn_subset != None:
    N_train      = num_learn
    
    assert batch_size <= num_learn
-
+   
 else:
     
    num_learn = None
@@ -233,6 +233,17 @@ if algorithm   == "CSS":
       exp_tag = "LR%sM%sBS%dNS%dRS%dDATA%dMF%d_%s"%specs
       
       resample = bool(resample)
+      
+report_p_tilda = False # uses pseudo likelihood by default
+   
+if (num_learn < 50) and (data_samples ==0) and (resample != 1):
+   
+   print("Will report p_tilda for this experiment")
+   report_p_tilda = True
+      
+else:
+       
+   print("Will report pseudo likelihoods for this experiment")
    
 num_iterations = N_train // batch_size
 
@@ -257,6 +268,7 @@ bm = BoltzmannMachine(num_vars        = input_dim,
                       is_uniform      = is_uniform,
                       mf_steps        = mf_steps,
                       use_momentum    = use_momentum,
+                      report_p_tilda  = report_p_tilda,
                       test_mode       = test_mode)
                       
 if test_add_complements:
@@ -331,7 +343,7 @@ else:
     
       bm.save_model_params(os.path.join(exp_path,"INIT_PARAMS.model"))
       print("saved initial weights of fully visible Boltzmann Machine")
-   
+      
 start_time = timeit.default_timer()
 
 epoch_time0 = start_time
@@ -344,9 +356,9 @@ for epoch_index in range(num_epochs):
     
     # put different learning_rate rules (per epoch) for now here:
     
-    # lrate_epoch = (1.0/(1+epoch_index/100.))*learning_rate/batch_size
+    lrate_epoch = (1.0/(1+epoch_index/100.))*learning_rate/batch_size
       
-    lrate_epoch = (0.9**epoch_index)*learning_rate  # 0.99
+    # lrate_epoch = (0.9**epoch_index)*learning_rate  # 0.99
     
     # lrate_epoch  = learning_rate
     
@@ -415,11 +427,12 @@ for epoch_index in range(num_epochs):
               if test_mode:
                       
                  t0 = timeit.default_timer()
-                 approx_minibatch_cost = optimize(sampling_var, 
-                                                  list(minibatch_inds),
-                                                  lrate_epoch)
+                 
+                 approx_cost, p_tilda = optimize(sampling_var, 
+                                                 list(minibatch_inds),
+                                                 lrate_epoch)
                                                   
-                 t1 = timeit.default_timer()
+                 t1 = timeit.default_timer()  
                  print("Gradient computation with implementation 1 took"+\
                  " --- %f minutes"%((t1 - t0)/60.0))
                  
@@ -445,16 +458,16 @@ for epoch_index in range(num_epochs):
                  
            if use_momentum:
               
-              approx_minibatch_cost = optimize(sampling_var, 
-                                               list(minibatch_inds),
-                                               lrate_epoch,
-                                               momentum_epoch)
+              approx_cost, p_tilda = optimize(sampling_var, 
+                                              list(minibatch_inds),
+                                              lrate_epoch,
+                                              momentum_epoch)
               
            else:
                   
-              approx_minibatch_cost = optimize(sampling_var, 
-                                               list(minibatch_inds),
-                                               lrate_epoch)   
+              approx_cost, p_tilda = optimize(sampling_var, 
+                                              list(minibatch_inds),
+                                              lrate_epoch)   
            ###
            opt_t1 = timeit.default_timer()
            print("Optimization step took --- %f minutes"%
@@ -466,21 +479,26 @@ for epoch_index in range(num_epochs):
            
            bm.x_gibbs.set_value(np.transpose(cd_sample)) 
            
-           approx_minibatch_cost = optimize(list(minibatch_inds),
-                                            lrate_epoch)
+           approx_cost, p_tilda = optimize(list(minibatch_inds),
+                                           lrate_epoch)
         
-        avg_cost_val.append(approx_minibatch_cost)
+        avg_cost_val.append(approx_cost)
         
-        if save_best_params and (abs(approx_minibatch_cost) < lowest_cost):
+        if save_best_params and (abs(approx_cost) < lowest_cost):
         
            bm.save_model_params(os.path.join(exp_path,"TRAINED_PARAMS.model")) 
            
-           lowest_cost = abs(approx_minibatch_cost) 
+           lowest_cost = abs(approx_cost) 
         
         if i % report_step ==0:
             
            print('Training epoch %d ---- Iter %d ---- cost value: %f'
-           %(epoch_index, i, approx_minibatch_cost))
+           %(epoch_index, i, approx_cost))
+           
+           if report_p_tilda:
+               
+              print("p_tilda:")
+              print(p_tilda)
            
         iter_end_time = timeit.default_timer()
         
@@ -528,7 +546,7 @@ if algorithm == "CSS":
 
           command_string =("python test_bm.py "+\
           "--path_to_params %s/%s_PARAMS.model "+\
-          "--num_samples 8 --num_chains %d --trained_subset 1 --num_steps 1")\
+          "--num_samples 8 --num_chains %d --trained_subset 1 --num_steps 100 --use_mf_sampler 1")\
           %(exp_path,file_tag, num_learn)
 
           subprocess.call(command_string ,shell=True)
