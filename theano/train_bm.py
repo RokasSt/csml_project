@@ -30,6 +30,8 @@ test_mode            = False
 
 save_images          = True
 
+save_best_params     = True
+
 test_add_complements = False
 
 test_comp_energies   = False
@@ -73,6 +75,8 @@ arg_parser.add_argument('--learn_subset', type = str, required = False)
 arg_parser.add_argument('--is_uniform', type = str, required = False)
 
 arg_parser.add_argument('--resample', type = str, required = False)
+
+arg_parser.add_argument('--momentum', type = str, required = False)
 
 arg_parser.add_argument('--batch_size', type = str, required=  True)
 
@@ -121,6 +125,33 @@ else:
     
    num_learn = None
    
+if FLAGS.momentum != None:
+    
+   momentum = float(FLAGS.momentum)
+   
+   if momentum != 0.0:
+       
+      use_momentum  = True
+      
+   else:
+       
+      use_momentum  = False
+      momentum      = 0.0
+      
+else:
+    
+   use_momentum = False
+   momentum     = 0.0
+   
+if test_mode:
+    
+   ## currently test_mode carries out 
+   ## tests on gradient computation only
+   ## to compare implicit and explicit 
+   ## implementations (without using momentum term)  
+   
+   use_momentum = False
+   
 if algorithm == "CD1":
     
    assert FLAGS.num_steps != None 
@@ -128,11 +159,12 @@ if algorithm == "CD1":
    num_cd_steps = int(FLAGS.num_steps)
    
    specs = (str(learning_rate),
+            str(momentum),
             batch_size,
             num_steps,
             datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" ))
 
-   exp_tag = "LR%sBS%dNST%d_%s"%specs
+   exp_tag = "LR%sM%sBS%dNST%d_%s"%specs
    
    num_samples = None 
    
@@ -157,12 +189,13 @@ if algorithm   == "CSS":
    if num_samples ==0:
    
       specs = (str(learning_rate),
+               str(momentum),
                batch_size,
                num_samples,
                data_sampples,
                datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" ))
    
-      exp_tag = "LR%sBS%dNS%dDATA%d_%s"%specs
+      exp_tag = "LR%sM%sBS%dNS%dDATA%d_%s"%specs
       
       resample = None
       
@@ -189,6 +222,7 @@ if algorithm   == "CSS":
       resample = int(FLAGS.resample)
        
       specs = (str(learning_rate),
+               str(momentum),
                batch_size,
                num_samples,
                resample,
@@ -196,7 +230,7 @@ if algorithm   == "CSS":
                mf_steps,
                datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" ))
    
-      exp_tag = "LR%sBS%dNS%dRS%dDATA%dMF%d_%s"%specs
+      exp_tag = "LR%sM%sBS%dNS%dRS%dDATA%dMF%d_%s"%specs
       
       resample = bool(resample)
    
@@ -222,6 +256,7 @@ bm = BoltzmannMachine(num_vars        = input_dim,
                       unique_samples  = resample,
                       is_uniform      = is_uniform,
                       mf_steps        = mf_steps,
+                      use_momentum    = use_momentum,
                       test_mode       = test_mode)
                       
 if test_add_complements:
@@ -275,7 +310,6 @@ elif test_mode:
    print("Testing mode")
    cd_sampling, optimize = bm.add_graph()
    
-    
 else:
     
    print("Training mode")
@@ -302,17 +336,23 @@ start_time = timeit.default_timer()
 
 epoch_time0 = start_time
 
+lowest_cost = np.inf
+
 for epoch_index in range(num_epochs):
     
     permuted_inds = np.random.permutation(N_train)
     
-    # put different learning_rate rules per epoch for now here:
+    # put different learning_rate rules (per epoch) for now here:
     
-    # lrate_epoch = (1.0/(1+num_epochs/100.))*learning_rate/batch_size
+    # lrate_epoch = (1.0/(1+epoch_index/100.))*learning_rate/batch_size
       
-    lrate_epoch = (0.98**epoch_index)*learning_rate
+    lrate_epoch = (0.9**epoch_index)*learning_rate  # 0.99
     
     # lrate_epoch  = learning_rate
+    
+    if use_momentum:
+    
+       momentum_epoch = momentum
     
     print("Learning rate for epoch %d --- %f"%(epoch_index,lrate_epoch))
     
@@ -335,7 +375,8 @@ for epoch_index in range(num_epochs):
                  bm.do_mf_updates(num_steps = mf_steps)
               
                  mf_t1 = timeit.default_timer()
-                 print("4 steps of MF updates took --- %f"%((mf_t1 -mf_t0)/60.0))
+                 print("4 steps of MF updates took --- %f"%
+                 ((mf_t1 -mf_t0)/60.0))
               
               else:
                   
@@ -354,9 +395,8 @@ for epoch_index in range(num_epochs):
                
               sampled_indices = bm.select_data(minibatch_inds)
               
-              approx_minibatch_cost = optimize(sampled_indices, 
-                                               list(minibatch_inds),
-                                               lrate_epoch)
+              sampling_var = sampled_indices
+                                               
            if data_samples ==0 and is_uniform:
                
               if resample > 0:
@@ -369,20 +409,16 @@ for epoch_index in range(num_epochs):
                  is_samples = bm.np_rand_gen.binomial(n=1,p=0.5, 
                  size = (bm.num_samples, bm.num_vars))
               
-              is_samples = np.asarray(is_samples, dtype = theano.config.floatX)
+              sampling_var = np.asarray(is_samples, 
+                                        dtype = theano.config.floatX)
               
-              if not test_mode:
-                  
-                 approx_minibatch_cost = optimize(is_samples,
-                                                  list(minibatch_inds),
-                                                  lrate_epoch)
-                  
-              else:
+              if test_mode:
                       
                  t0 = timeit.default_timer()
-                 approx_minibatch_cost = optimize(is_samples, 
+                 approx_minibatch_cost = optimize(sampling_var, 
                                                   list(minibatch_inds),
                                                   lrate_epoch)
+                                                  
                  t1 = timeit.default_timer()
                  print("Gradient computation with implementation 1 took"+\
                  " --- %f minutes"%((t1 - t0)/60.0))
@@ -406,6 +442,19 @@ for epoch_index in range(num_epochs):
                  print("Equivalence of b updates in two implementations:")
                  print((np.round(b_implicit,12) == np.round(b_explicit,12)).all())
                  sys.exit()
+                 
+           if use_momentum:
+              
+              approx_minibatch_cost = optimize(sampling_var, 
+                                               list(minibatch_inds),
+                                               lrate_epoch,
+                                               momentum_epoch)
+              
+           else:
+                  
+              approx_minibatch_cost = optimize(sampling_var, 
+                                               list(minibatch_inds),
+                                               lrate_epoch)   
            ###
            opt_t1 = timeit.default_timer()
            print("Optimization step took --- %f minutes"%
@@ -421,6 +470,12 @@ for epoch_index in range(num_epochs):
                                             lrate_epoch)
         
         avg_cost_val.append(approx_minibatch_cost)
+        
+        if save_best_params and (abs(approx_minibatch_cost) < lowest_cost):
+        
+           bm.save_model_params(os.path.join(exp_path,"TRAINED_PARAMS.model")) 
+           
+           lowest_cost = abs(approx_minibatch_cost) 
         
         if i % report_step ==0:
             
@@ -443,7 +498,9 @@ for epoch_index in range(num_epochs):
     
     print ('Training epoch took %f minutes'%((epoch_time - epoch_time0)/60.))
     
-    bm.save_model_params(os.path.join(exp_path,"TRAINED_PARAMS.model"))
+    if not save_best_params:
+    
+       bm.save_model_params(os.path.join(exp_path,"TRAINED_PARAMS.model"))
     
     epoch_time0 = epoch_time
     

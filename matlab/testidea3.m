@@ -32,9 +32,8 @@ logkappa = -(log(S)+D*log(0.5));
 Nloops=1500;
 for loop=1:Nloops
 epsilon=(1/(1+loop/100))*0.001/N;
-%epsilon=(1/(1+loop/100))*0.001/N;
-
-    loop
+%epsilon=(1/(1+loop/100))*0.001/N; 
+    disp(loop);
     gradW=zeros(D,D);
     gradb=zeros(D,1);
     

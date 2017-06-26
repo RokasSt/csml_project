@@ -20,7 +20,7 @@ kappa=1/(S*0.5^D);
 Nloops=1500;
 for loop=1:Nloops
 epsilon=(1/(1+loop/100))*0.01/N;
-    loop
+    disp(loop);
     gradW=zeros(D,D);
     gradb=zeros(D,1);
     

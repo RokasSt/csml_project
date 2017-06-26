@@ -32,12 +32,13 @@ class BoltzmannMachine(object):
                  unique_samples = None,
                  is_uniform   = None,
                  mf_steps = None,
+                 use_momentum = None,
                  W= None, 
                  b= None, 
                  test_mode= False,
                  training = True):
         
-        """ Constructor for Boltzmann Machine
+        """ Constructor for Fully Visible Boltzmann Machine
         
         num_vars - a number of visible nodes/variables
         
@@ -60,6 +61,8 @@ class BoltzmannMachine(object):
         self.mf_steps       = mf_steps
         
         self.is_uniform     = is_uniform
+        
+        self.use_momentum   = use_momentum
         
         self.side = int(np.sqrt(self.num_vars))
         
@@ -86,6 +89,20 @@ class BoltzmannMachine(object):
                                           borrow= True)
                                           
            self.learning_rate  = T.dscalar('learning_rate')
+           
+           if use_momentum == True:
+               
+              print("Will add momentum term to gradient computations")
+              
+              self.momentum  = T.dscalar('learning_rate')
+              
+              self.grad_vec = {}
+              
+              self.grad_vec['W'] = theano.shared(np.zeros([self.num_vars, self.num_vars],
+              dtype = theano.config.floatX), name = 'W_momentum', borrow = True)
+              
+              self.grad_vec['b'] = theano.shared(np.zeros([self.num_vars],
+              dtype = theano.config.floatX), name = 'b_momentum', borrow = True)
                                           
            if test_mode:
               
@@ -572,10 +589,7 @@ class BoltzmannMachine(object):
                                     
     def add_grad_updates(self):
         
-        """  compute and collect gradient updates to dictionary
-        
-        lrate - learning rate
-        """
+        """ Compute and collect gradient updates to dictionary """
         
         gradients = T.grad(self.cost, self.theta)
         
@@ -586,7 +600,21 @@ class BoltzmannMachine(object):
                grad = grad - T.diag(T.diag(grad)) # no x i - xi connections
                # for all i = 1, ..., D
                
-            self.updates[target_param] = target_param - self.learning_rate*grad
+            if self.use_momentum:
+                
+               g_tilda = self.momentum*self.grad_vec[target_param.name] - \
+               self.learning_rate*grad
+                
+               self.updates[target_param] = target_param + g_tilda
+               
+               # store g_tilda for next iteration:
+               
+               self.updates[self.grad_vec[target_param.name]] = g_tilda
+               
+            else:
+               
+               self.updates[target_param] = target_param -\
+               self.learning_rate*grad
             
             ## or T.cast(lrate, dtype = theano.config.floatX) to 
             ## guarantee compatibility with GPU
@@ -690,6 +718,10 @@ class BoltzmannMachine(object):
            var_list = [self.minibatch_set]
            
         var_list.append(self.learning_rate)
+        
+        if self.use_momentum:
+            
+           var_list.append(self.momentum)
            
         opt_step = theano.function(inputs = var_list,
                                    outputs=self.pseudo_cost,
