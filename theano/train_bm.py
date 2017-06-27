@@ -32,11 +32,15 @@ save_images          = True
 
 save_best_params     = True
 
+save_end_params      = True
+
 test_add_complements = False
 
 test_comp_energies   = False
 
 save_init_weights    = True
+
+gen_samples          = False
 
 test_images      = np.round(mnist.test.images)
 
@@ -377,7 +381,15 @@ for epoch_index in range(num_epochs):
         minibatch_inds = permuted_inds[batch_size*i:batch_size*(i+1)]
         
         if algorithm =="CSS":
-           
+            
+           #if (epoch_index > 0) and (epoch_index%1000 == 0):
+              
+              #if num_samples > 10:
+              
+               #  num_samples = int(0.1*num_samples)
+              
+               #  print("Decreasing number of samples to %d"%bm.num_samples)
+              
            if (num_samples > 0) and (is_uniform != True):
                
               if bool(mf_steps):
@@ -417,7 +429,7 @@ for epoch_index in range(num_epochs):
                  size = (bm.num_samples*batch_size, bm.num_vars))
                  
               else:
-               
+                 
                  is_samples = bm.np_rand_gen.binomial(n=1,p=0.5, 
                  size = (bm.num_samples, bm.num_vars))
               
@@ -430,7 +442,8 @@ for epoch_index in range(num_epochs):
                  
                  approx_cost, p_tilda = optimize(sampling_var, 
                                                  list(minibatch_inds),
-                                                 lrate_epoch)
+                                                 lrate_epoch,
+                                                 num_samples)
                                                   
                  t1 = timeit.default_timer()  
                  print("Gradient computation with implementation 1 took"+\
@@ -461,13 +474,15 @@ for epoch_index in range(num_epochs):
               approx_cost, p_tilda = optimize(sampling_var, 
                                               list(minibatch_inds),
                                               lrate_epoch,
-                                              momentum_epoch)
+                                              momentum_epoch,
+                                              num_samples)
               
            else:
-                  
+              
               approx_cost, p_tilda = optimize(sampling_var, 
                                               list(minibatch_inds),
-                                              lrate_epoch)   
+                                              lrate_epoch,
+                                              num_samples)   
            ###
            opt_t1 = timeit.default_timer()
            print("Optimization step took --- %f minutes"%
@@ -480,7 +495,8 @@ for epoch_index in range(num_epochs):
            bm.x_gibbs.set_value(np.transpose(cd_sample)) 
            
            approx_cost, p_tilda = optimize(list(minibatch_inds),
-                                           lrate_epoch)
+                                           lrate_epoch,
+                                           num_samples)
         
         avg_cost_val.append(approx_cost)
         
@@ -497,8 +513,10 @@ for epoch_index in range(num_epochs):
            
            if report_p_tilda:
                
-              print("p_tilda:")
-              print(p_tilda)
+              print("p_tilda values for training examples:")
+              print(p_tilda[0:batch_size])
+              print("sum of these values:")
+              print(np.sum(p_tilda[0:batch_size]))
            
         iter_end_time = timeit.default_timer()
         
@@ -525,12 +543,16 @@ for epoch_index in range(num_epochs):
 training_time = (epoch_time0 - start_time)/60.0
 
 print('Training took %f minutes'%training_time)
+
+if save_end_params:
+    
+   bm.save_model_params(os.path.join(exp_path,"TRAINED_PARAMS_END.model"))
     
 np.savetxt(os.path.join(exp_path,"TRAIN_LOSSES.dat"), losses)
 
 np.savetxt(os.path.join(exp_path,"TRAINING_TIME.dat"), np.array([training_time]))
 
-if algorithm == "CSS":
+if algorithm == "CSS" and gen_samples:
 
    if (FLAGS.learn_subset != None) and (num_learn > 0):
 
@@ -538,16 +560,16 @@ if algorithm == "CSS":
           
           if file_tag == 'TRAINED':
               
-             print("Testing trained model")
+             print("Testing trained model -----------------------------")
              
           if file_tag == 'INIT':
               
-            print("Testing initialized model")
+            print("Testing initialized model --------------------------")
 
           command_string =("python test_bm.py "+\
           "--path_to_params %s/%s_PARAMS.model "+\
-          "--num_samples 8 --num_chains %d --trained_subset 1 --num_steps 100 --use_mf_sampler 1")\
-          %(exp_path,file_tag, num_learn)
+          "--num_samples 8 --num_chains %d --trained_subset 1"+\
+          " --num_steps 100 --use_mf_sampler 1")%(exp_path,file_tag, num_learn)
 
           subprocess.call(command_string ,shell=True)
 

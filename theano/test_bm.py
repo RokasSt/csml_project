@@ -78,13 +78,19 @@ if bool(trained_subset):
     
    indices =np.loadtxt(os.path.join(split_path[0],"LEARNT_INSTANCES.dat"))
    
-   indices = np.asarray(indices, dtype = np.int64)
+   indices = np.array(indices, dtype = np.int64)
    
    test_inputs = train_images[indices,:]
    
    #override a given num_chains
    
-   num_chains  = len(indices)
+   if indices.size == 1:
+       
+      num_chains = 1
+       
+   else:
+   
+      num_chains  = len(indices)
    
 else:
     

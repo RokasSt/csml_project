@@ -132,16 +132,21 @@ class BoltzmannMachine(object):
            else:
                                           
               if W is None:
+                  
+                 # different W initializations: 
         
-                 uniform_init =\
-                 self.np_rand_gen.uniform(-np.sqrt(3.0/(num_vars)),\
-                 np.sqrt(3.0 / (num_vars)), size = (num_vars, num_vars))
+                 # uniform_init =\
+                 # self.np_rand_gen.uniform(-np.sqrt(3.0/(num_vars)),\
+                 # np.sqrt(3.0 / (num_vars)), size = (num_vars, num_vars))
                  
-                 #uniform_init =\
-                 #self.np_rand_gen.uniform(-0.00000001,\
-                 #0.00000001, size = (num_vars, num_vars)) 
+                 # uniform_init =\
+                 # self.np_rand_gen.uniform(-0.00000001,\
+                 # 0.00000001, size = (num_vars, num_vars)) 
+                 
+                 W0_init = 0.00000001*\
+                 self.np_rand_gen.normal(size = (num_vars, num_vars)) 
         
-                 W0 = np.asarray(uniform_init, dtype = theano.config.floatX)
+                 W0 = np.asarray(W0_init, dtype = theano.config.floatX)
               
                  W0 = (W0 + np.transpose(W0))/2.0
               
@@ -180,6 +185,8 @@ class BoltzmannMachine(object):
            self.minibatch_set   = T.ivector('minibatch_set')
         
            self.sample_set      = T.ivector('sample_set')
+           
+           self.use_num_samples = T.iscalar('num_samples')
            
            if self.algorithm == "CD1":
            
@@ -235,19 +242,19 @@ class BoltzmannMachine(object):
         
            weight_term    = theano.gradient.disconnected_grad(weight_term)
         
-           weight_term    = T.log(self.num_samples*weight_term)
+           weight_term    = T.log(self.use_num_samples*weight_term)
         
            approx_Z_mf, updates = \
            theano.scan(lambda i : -self.compute_energy(list_mf_samples[i],\
-           self.num_samples),sequences = [T.arange(self.batch_size)])
+           self.use_num_samples),sequences = [T.arange(self.batch_size)])
         
            self.updates.update(updates)
         
            weight_term   = T.reshape(weight_term,
-                                    [self.batch_size, self.num_samples])
+                                    [self.batch_size, self.use_num_samples])
         
            approx_Z_mf = T.reshape(approx_Z_mf,
-                                   [self.batch_size, self.num_samples])
+                                   [self.batch_size, self.use_num_samples])
                                      
            approx_Z_mf = approx_Z_mf - weight_term
            
@@ -261,9 +268,9 @@ class BoltzmannMachine(object):
         
            weight_term = theano.gradient.disconnected_grad(weight_term)
         
-           weight_term = T.log(self.num_samples*weight_term)
+           weight_term = T.log(self.use_num_samples*weight_term)
               
-           approx_Z_mf = -self.compute_energy(mf_samples, self.num_samples)
+           approx_Z_mf = -self.compute_energy(mf_samples, self.use_num_samples)
               
            approx_Z_mf = approx_Z_mf - weight_term
            
@@ -275,23 +282,22 @@ class BoltzmannMachine(object):
         in the approximating term in normalizer Z. Samples are obtained
         using uniform importances sampling."""
         
-        weight_term = T.log(self.num_samples) + self.num_vars*T.log(0.5)
+        weight_term = T.log(self.use_num_samples) + self.num_vars*T.log(0.5)
         
         if self.unique_samples:
            
            approx_Z = -self.compute_energy(self.x_tilda, 
-                                           self.num_samples*self.batch_size)
+                                           self.use_num_samples*self.batch_size)
            
         else:
-            
-           approx_Z = -self.compute_energy(self.x_tilda, 
-                                           self.num_samples)
+           
+           approx_Z = -self.compute_energy(self.x_tilda, self.use_num_samples)
               
         approx_Z = approx_Z - weight_term
         
         if self.unique_samples:
            
-           approx_Z = T.reshape(approx_Z, [self.batch_size, self.num_samples])
+           approx_Z = T.reshape(approx_Z, [self.batch_size, self.use_num_samples])
         
         return approx_Z
         
@@ -337,11 +343,11 @@ class BoltzmannMachine(object):
            if self.is_uniform:
               
               max_vals_tiled = T.tile(max_vals,
-                                      (1,self.num_samples+self.batch_size))
+                                      (1,self.use_num_samples+self.batch_size))
                
            else:
            
-              max_vals_tiled= T.tile(max_vals,(1,self.num_samples+1))
+              max_vals_tiled= T.tile(max_vals,(1,self.use_num_samples+1))
            
            approx_Z = approx_Z - max_vals_tiled
         
@@ -481,7 +487,7 @@ class BoltzmannMachine(object):
         """ function to sample from mean-field distribution """
         
         samples = self.theano_rand_gen.binomial(size= (self.num_vars,
-                                                       self.num_samples),
+                                                       self.use_num_samples),
                                                 n   = 1, 
                                                 p   = self.mf_params,
                                                 dtype=theano.config.floatX)
@@ -764,6 +770,8 @@ class BoltzmannMachine(object):
         else:
             
            output_vars.append(T.shared(0))
+        
+        var_list.append(self.use_num_samples)
            
         opt_step = theano.function(inputs  = var_list,
                                    outputs = output_vars,
@@ -945,7 +953,7 @@ class BoltzmannMachine(object):
         gradb-self.batch_size*self.p_tilda[self.batch_size+i]*\
         self.x_tilda[i,:]],
         outputs_info =[gradW, gradb],
-        sequences =[T.arange(self.num_samples)])
+        sequences =[T.arange(self.use_num_samples)])
         
         gradW = gradW[-1] /self.batch_size
         
@@ -1094,7 +1102,12 @@ class BoltzmannMachine(object):
             
             p_out, samples_out = get_samples()
             
-            #self.x_gibbs.set_value(init_chains)     
+            self.x_gibbs.set_value(init_chains)
+            
+            print("Sample %d -- max pixel activations for %d gibbs chains:"%
+            (ind, num_chains))
+            
+            print(np.max(np.transpose(p_out), axis= 1))
             
             images[num_chains*(ind+1):num_chains*(ind+2),:] = \
             np.round(np.transpose(p_out))

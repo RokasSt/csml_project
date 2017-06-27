@@ -8,7 +8,7 @@ D=d*d;
 
 % MNIST data:
 
-path =['../theano/logs_CSS/LR0.001BS10NS100RS0DATA0MF0_0316PM_June23_2017/'...
+path =['../theano/logs_CSS/LR0.001M0.0BS10NS100RS0DATA0MF0_1127AM_June27_2017/'...
     'TRAIN_IMAGES.dat'];
 
 train_images = load(path);
@@ -17,9 +17,13 @@ x= train_images';
 
 [D, N] = size(x);
 
+disp(D)
+disp(N)
+
 % try to learn this:
-W=0.00000001*randn(D,D); W=0.5*(W+W');
-b=0*randn(D,1);
+W = 0.00000001*randn(D,D); W=0.5*(W+W');
+W = W - diag(diag(W));
+b = 0*randn(D,1);
 Winit=W;
 
 S=100;
@@ -60,10 +64,12 @@ epsilon=(1/(1+loop/100))*0.001/N;
         gradb=gradb - N*ptilde(N+s)*Sample(:,s);
     end
     
-    %sum(ptilde)
-    W=W+epsilon*gradW;
+    disp(sum(ptilde(1:N)))
+    gradW = gradW - diag(diag(gradW));
+    W=W+epsilon*gradW; 
     b=b+epsilon*gradb;
     plot(ptilde(1:N)); drawnow
 end
+
 
 
