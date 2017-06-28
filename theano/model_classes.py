@@ -72,8 +72,11 @@ class BoltzmannMachine(object):
         
         self.np_rand_gen = np.random.RandomState(1234)
         
+        #self.theano_rand_gen =\
+         #theano.sandbox.rng_mrg.MRG_RandomStreams(self.np_rand_gen.randint(2**30))
+         
         self.theano_rand_gen =\
-         theano.sandbox.rng_mrg.MRG_RandomStreams(self.np_rand_gen.randint(2**30))
+         T.shared_randomstreams.RandomStreams(self.np_rand_gen.randint(2**30))
                                          
         self.algorithm = algorithm
         
@@ -81,6 +84,10 @@ class BoltzmannMachine(object):
         
         self.node_indices  = \
         theano.shared(np.arange(self.num_vars), name="node_indices")
+        
+        self.x               = T.matrix('x')
+           
+        self.x_tilda         = T.matrix('x_tilda')
         
         if training:
            
@@ -175,10 +182,6 @@ class BoltzmannMachine(object):
                  self.b = b
            
            self.theta           = [self.W, self.b]
-        
-           self.x               = T.matrix('x')
-           
-           self.x_tilda         = T.matrix('x_tilda')
            
            self.train_set       = set(range(self.N_train))
         
@@ -204,7 +207,7 @@ class BoltzmannMachine(object):
               self.mf_params = theano.shared(init_mf, 
                                              name= "mf_params", 
                                              borrow= True)
-    
+                                             
     def energy_function(self, x):
     
         """ to compute energy function for fully visible Boltzmann machine
@@ -820,9 +823,10 @@ class BoltzmannMachine(object):
         """
         
         (get_p, get_samples), updates  =\
-         theano.scan(self.gibbs_update_node, 
-                     sequences =[T.arange(self.num_vars)])
-        
+         theano.scan(self.gibbs_update_node,\
+         sequences = [self.theano_rand_gen.permutation(n=self.num_vars)])
+         #sequences =[T.arange(self.num_vars)])
+         
         return (get_p, get_samples), updates
         
     def add_graph(self):
@@ -854,7 +858,33 @@ class BoltzmannMachine(object):
         optimize = self.optimization_step()
  
         return cd_sampling, optimize
-    
+        
+    def test_p_tilda(self, test_inputs, random_inputs):
+        
+        """ function to test p_tilda values with trained Boltzmann Machine"""
+        
+        self.batch_size      = test_inputs.shape[0]
+        
+        self.num_samples     = random_inputs.shape[0]
+        
+        self.use_num_samples = self.num_samples
+        
+        self.add_p_tilda()
+        
+        var_list = [self.x, self.x_tilda]
+        
+        get_p_tilda = theano.function(inputs = var_list,
+                                      outputs= self.p_tilda)
+                                     
+        probs = get_p_tilda(test_inputs, random_inputs)
+        
+        print("p_tilda values for training examples:")
+        print(probs[0:self.batch_size])
+        print("")
+        print("p_tilda values for 10 randomly chosen samples:")
+        si = self.batch_size+self.np_rand_gen.choice(self.num_samples, 10, False)
+        print(probs[si])
+        
     def relative_likelihood(self):
     
         """ function to compute relative, unnormalized likelihood 
@@ -868,8 +898,6 @@ class BoltzmannMachine(object):
         of given examples"""
         
         self.batch_size = inputs.shape[0]
-        
-        self.x = T.matrix('x')
         
         prob_op = self.relative_likelihood()
         
@@ -1057,39 +1085,50 @@ class BoltzmannMachine(object):
                           save_to_path = save_to_path,
                           test_images = False)    
     
-    def sample_from_bm(self, 
-                       test_inputs,
+    def sample_from_bm(self,
                        num_chains, 
                        num_samples,
                        num_steps,
-                       save_to_path):
+                       save_to_path,
+                       test_inputs = None):
         
         """ function to generate images from trained 
         Boltzmann Machine (fully visible).
         """
         
-        self.test_inputs = theano.shared(np.asarray(test_inputs,
+        if type(test_inputs) is  np.ndarray:
+            
+           print("Will initialize gibbs chains with dataset images")
+           
+           num_test_examples = test_inputs.shape[0]
+           
+           self.test_inputs = theano.shared(np.asarray(test_inputs,
                                          dtype=theano.config.floatX),
-                                         borrow= True)
+                                         borrow= True) 
+                                         
+           select_examples = np.random.choice(num_test_examples, 
+                                              num_chains, 
+                                              replace=False)
         
-        self.num_test_examples = test_inputs.shape[0]
+           init_chains =  np.asarray(
+              self.test_inputs.get_value(borrow=True)[select_examples,:],
+              dtype=theano.config.floatX)
+        
+        else:
+        
+           print("Will initialize gibbs chains with random images")
+           init_chains = self.np_rand_gen.binomial(n=1,p=0.5, 
+           size = (num_chains, self.num_vars))
         
         images = np.zeros([num_chains*num_samples+num_chains, self.num_vars])
         
-        select_examples = np.random.choice(self.num_test_examples, 
-                                           num_chains, 
-                                           replace=False)
-        
-        init_chains =  np.asarray(
-            self.test_inputs.get_value(borrow=True)[select_examples,:],
-            dtype=theano.config.floatX)
-            
         images[0:num_chains,:] = init_chains
         
         self.x_gibbs = theano.shared(init_chains)
         
         theano.config.exception_verbosity = 'high'
         
+        print("Running gibbs chains ... ")
         (p_xi_given_x_, x_samples), updates =\
         theano.scan(self.gibbs_step_fully_visible, n_steps = num_steps)
         

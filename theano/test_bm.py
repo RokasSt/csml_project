@@ -23,6 +23,11 @@ import timeit
 import os
 from   model_classes import BoltzmannMachine
 
+
+np_rand_gen = np.random.RandomState(1234)
+
+num_is_samples = 10000
+
 mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 
 test_images      = np.round(mnist.test.images)
@@ -35,9 +40,9 @@ train_labels     = mnist.train.labels
 
 num_train_images = train_images.shape[0]
 
-input_dim        = train_images.shape[1]
+D                = train_images.shape[1]
 
-assert input_dim == 784
+assert D == 784
 
 validate_images  = np.round(mnist.validation.images)
 
@@ -57,22 +62,26 @@ arg_parser.add_argument('--num_steps', type = str, required = True)
 
 arg_parser.add_argument('--use_mf_sampler', type = str, required = True)
 
-FLAGS, _         = arg_parser.parse_known_args()
+arg_parser.add_argument('--init_with_dataset', type = str, required = True)
 
-path_to_params   = FLAGS.path_to_params
+FLAGS, _          = arg_parser.parse_known_args()
 
-num_samples      = int(FLAGS.num_samples)
+path_to_params    = FLAGS.path_to_params
 
-num_chains       = int(FLAGS.num_chains)
+num_samples       = int(FLAGS.num_samples)
 
-trained_subset   = int(FLAGS.trained_subset)
+num_chains        = int(FLAGS.num_chains)
 
-num_steps        = int(FLAGS.num_steps)
+trained_subset    = int(FLAGS.trained_subset)
 
-mf_sampler    = bool(int(FLAGS.use_mf_sampler)) # alternatively, sample
-# from mean-field approximation
+num_steps         = int(FLAGS.num_steps)
 
-split_path       = os.path.split(path_to_params)
+mf_sampler        = bool(int(FLAGS.use_mf_sampler)) # alternatively,
+# sample from mean-field approximation
+
+init_with_dataset = bool(int(FLAGS.init_with_dataset))
+
+split_path        = os.path.split(path_to_params)
 
 if bool(trained_subset):
     
@@ -116,7 +125,7 @@ else:
     
    save_to_path = os.path.join(split_path[0],filename+".jpeg")
 
-bm = BoltzmannMachine(num_vars        = input_dim, 
+bm = BoltzmannMachine(num_vars        = D, 
                       training        = False)
                       
 bm.load_model_params(full_path = path_to_params)
@@ -136,8 +145,21 @@ if bool(trained_subset):
               
    rand_samples = np.asarray(rand_samples, 
                              dtype = theano.config.floatX)
-
+   
    bm.test_relative_probability(inputs = rand_samples, trained = False)
+   
+   print("------------------------------------------------------------")
+   print("-------------- Computing p_tilda values --------------------")
+   print("------------------------------------------------------------")
+   print("")
+   is_samples = np_rand_gen.binomial(n=1, p=0.5, size = (num_is_samples, D))
+   
+   bm.test_p_tilda(test_inputs, is_samples)
+   
+## init_with_dataset overrides trained_subset option
+if not init_with_dataset:
+    
+   test_inputs = None   
    
 if mf_sampler:
 
@@ -151,11 +173,11 @@ if mf_sampler:
     
 else:
 
-   bm.sample_from_bm(test_inputs  = test_inputs,
-                     num_chains   = num_chains, 
+   bm.sample_from_bm(num_chains   = num_chains, 
                      num_samples  = num_samples,
                      num_steps    = num_steps,
-                     save_to_path = save_to_path)
+                     save_to_path = save_to_path,
+                     test_inputs  = test_inputs)
                     
 end_time = timeit.default_timer()
                    
