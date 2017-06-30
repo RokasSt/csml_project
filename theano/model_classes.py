@@ -189,7 +189,7 @@ class BoltzmannMachine(object):
         
            self.sample_set      = T.ivector('sample_set')
            
-           self.use_num_samples = T.iscalar('num_samples')
+           self.var_num_samples = T.iscalar('var_num_samples')
            
            if self.algorithm == "CD1":
            
@@ -245,19 +245,19 @@ class BoltzmannMachine(object):
         
            weight_term    = theano.gradient.disconnected_grad(weight_term)
         
-           weight_term    = T.log(self.use_num_samples*weight_term)
+           weight_term    = T.log(self.var_num_samples*weight_term)
         
            approx_Z_mf, updates = \
            theano.scan(lambda i : -self.compute_energy(list_mf_samples[i],\
-           self.use_num_samples),sequences = [T.arange(self.batch_size)])
+           self.var_num_samples),sequences = [T.arange(self.batch_size)])
         
            self.updates.update(updates)
         
            weight_term   = T.reshape(weight_term,
-                                    [self.batch_size, self.use_num_samples])
+                                    [self.batch_size, self.var_num_samples])
         
            approx_Z_mf = T.reshape(approx_Z_mf,
-                                   [self.batch_size, self.use_num_samples])
+                                   [self.batch_size, self.var_num_samples])
                                      
            approx_Z_mf = approx_Z_mf - weight_term
            
@@ -271,9 +271,9 @@ class BoltzmannMachine(object):
         
            weight_term = theano.gradient.disconnected_grad(weight_term)
         
-           weight_term = T.log(self.use_num_samples*weight_term)
+           weight_term = T.log(self.var_num_samples*weight_term)
               
-           approx_Z_mf = -self.compute_energy(mf_samples, self.use_num_samples)
+           approx_Z_mf = -self.compute_energy(mf_samples, self.var_num_samples)
               
            approx_Z_mf = approx_Z_mf - weight_term
            
@@ -285,22 +285,22 @@ class BoltzmannMachine(object):
         in the approximating term in normalizer Z. Samples are obtained
         using uniform importances sampling."""
         
-        weight_term = T.log(self.use_num_samples) + self.num_vars*T.log(0.5)
+        weight_term = T.log(self.var_num_samples) + self.num_vars*T.log(0.5)
         
         if self.unique_samples:
            
            approx_Z = -self.compute_energy(self.x_tilda, 
-                                           self.use_num_samples*self.batch_size)
+                                           self.var_num_samples*self.batch_size)
            
         else:
            
-           approx_Z = -self.compute_energy(self.x_tilda, self.use_num_samples)
+           approx_Z = -self.compute_energy(self.x_tilda, self.var_num_samples)
               
         approx_Z = approx_Z - weight_term
         
         if self.unique_samples:
            
-           approx_Z = T.reshape(approx_Z, [self.batch_size, self.use_num_samples])
+           approx_Z = T.reshape(approx_Z, [self.batch_size, self.var_num_samples])
         
         return approx_Z
         
@@ -346,11 +346,11 @@ class BoltzmannMachine(object):
            if self.is_uniform:
               
               max_vals_tiled = T.tile(max_vals,
-                                      (1,self.use_num_samples+self.batch_size))
+                                      (1,self.var_num_samples+self.batch_size))
                
            else:
            
-              max_vals_tiled= T.tile(max_vals,(1,self.use_num_samples+1))
+              max_vals_tiled= T.tile(max_vals,(1,self.var_num_samples+1))
            
            approx_Z = approx_Z - max_vals_tiled
         
@@ -490,7 +490,7 @@ class BoltzmannMachine(object):
         """ function to sample from mean-field distribution """
         
         samples = self.theano_rand_gen.binomial(size= (self.num_vars,
-                                                       self.use_num_samples),
+                                                       self.var_num_samples),
                                                 n   = 1, 
                                                 p   = self.mf_params,
                                                 dtype=theano.config.floatX)
@@ -774,7 +774,7 @@ class BoltzmannMachine(object):
             
            output_vars.append(T.shared(0))
         
-        var_list.append(self.use_num_samples)
+        var_list.append(self.var_num_samples)
            
         opt_step = theano.function(inputs  = var_list,
                                    outputs = output_vars,
@@ -815,18 +815,24 @@ class BoltzmannMachine(object):
         
         return (p_xi_given_x_, samples), updates
          
-    def gibbs_step_fully_visible(self):
+    def gibbs_step_fully_visible(self, ordered = True):
         
         """   
         Function to inplement a Gibbs step for fully
         visible Boltzmann Machine. 
         """
         
+        if ordered:
+            
+           seq_var = T.arange(self.num_vars)
+           
+        else:
+            
+           seq_var = self.theano_rand_gen.permutation(n=self.num_vars)
+        
         (get_p, get_samples), updates  =\
-         theano.scan(self.gibbs_update_node,\
-         sequences = [self.theano_rand_gen.permutation(n=self.num_vars)])
-         #sequences =[T.arange(self.num_vars)])
-         
+         theano.scan(self.gibbs_update_node, sequences = [seq_var])
+        
         return (get_p, get_samples), updates
         
     def add_graph(self):
@@ -867,7 +873,7 @@ class BoltzmannMachine(object):
         
         self.num_samples     = random_inputs.shape[0]
         
-        self.use_num_samples = self.num_samples
+        self.var_num_samples = self.num_samples
         
         self.add_p_tilda()
         
@@ -878,12 +884,9 @@ class BoltzmannMachine(object):
                                      
         probs = get_p_tilda(test_inputs, random_inputs)
         
-        print("p_tilda values for training examples:")
-        print(probs[0:self.batch_size])
-        print("")
-        print("p_tilda values for 10 randomly chosen samples:")
         si = self.batch_size+self.np_rand_gen.choice(self.num_samples, 10, False)
-        print(probs[si])
+        
+        return probs[0:self.batch_size], probs[si]
         
     def relative_likelihood(self):
     
@@ -981,7 +984,7 @@ class BoltzmannMachine(object):
         gradb-self.batch_size*self.p_tilda[self.batch_size+i]*\
         self.x_tilda[i,:]],
         outputs_info =[gradW, gradb],
-        sequences =[T.arange(self.use_num_samples)])
+        sequences =[T.arange(self.var_num_samples)])
         
         gradW = gradW[-1] /self.batch_size
         
@@ -1026,12 +1029,14 @@ class BoltzmannMachine(object):
         
         self.num_samples = num_chains
         
+        self.var_num_samples = self.num_samples
+        
         if type(test_inputs) is  np.ndarray:
            print("Will initialize MF parameters with input images") 
            init_mf = np.transpose(test_inputs)
             
         else:
-        
+           
            print("Will initialize MF parameters with uniform distribution")
            init_mf = self.np_rand_gen.uniform(0,1, 
            size = (self.num_vars, self.num_samples))
@@ -1090,7 +1095,8 @@ class BoltzmannMachine(object):
                        num_samples,
                        num_steps,
                        save_to_path,
-                       test_inputs = None):
+                       test_inputs = None,
+                       print_gibbs = False):
         
         """ function to generate images from trained 
         Boltzmann Machine (fully visible).
@@ -1098,7 +1104,7 @@ class BoltzmannMachine(object):
         
         if type(test_inputs) is  np.ndarray:
             
-           print("Will initialize gibbs chains with dataset images")
+           print("Will initialize gibbs chains with dataset images\n")
            
            num_test_examples = test_inputs.shape[0]
            
@@ -1116,7 +1122,7 @@ class BoltzmannMachine(object):
         
         else:
         
-           print("Will initialize gibbs chains with random images")
+           print("Will initialize gibbs chains with random images\n")
            init_chains = self.np_rand_gen.binomial(n=1,p=0.5, 
            size = (num_chains, self.num_vars))
         
@@ -1128,25 +1134,54 @@ class BoltzmannMachine(object):
         
         theano.config.exception_verbosity = 'high'
         
-        print("Running gibbs chains ... ")
+        print("Running gibbs chains ...\n")
         (p_xi_given_x_, x_samples), updates =\
         theano.scan(self.gibbs_step_fully_visible, n_steps = num_steps)
         
+        output_vars = [p_xi_given_x_, x_samples]
+        
         get_samples = theano.function(inputs  = [],
-                                      outputs = [p_xi_given_x_[-1],
-                                      x_samples[-1]], 
+                                      outputs = output_vars, 
                                       updates = updates)
                                       
         for ind in range(num_samples):
             
-            p_out, samples_out = get_samples()
+            p_all, samples_all = get_samples()
             
-            self.x_gibbs.set_value(init_chains)
+            if print_gibbs:
+            
+               self.print_gibbs_conditionals(p_vals = p_all)
+               
+            p_out, samples_out = self.assemble_image(p_all, 
+                                                     samples_all,
+                                                     num_chains,
+                                                     step = 100)
+            
+            #p_out = p_all
+               
+            #samples_out = samples_all[-1]
+            
+            # without resetting the chains are persistent
+            #self.x_gibbs.set_value(init_chains)
             
             print("Sample %d -- max pixel activations for %d gibbs chains:"%
             (ind, num_chains))
-            
             print(np.max(np.transpose(p_out), axis= 1))
+            print("")
+            
+            is_samples = self.np_rand_gen.binomial(n=1, 
+                                                   p=0.5, 
+                                                   size = (10000, self.num_vars))
+   
+            gibbs_p_tilda, rand_p_tilda = \
+            self.test_p_tilda(np.transpose(samples_out), is_samples)
+            
+            print("p_tilda values for gibbs samples:")
+            print(gibbs_p_tilda)
+            print("")
+            print("p_tilda values for randomly chosen importance samples:")
+            print(rand_p_tilda)
+            print("")
             
             images[num_chains*(ind+1):num_chains*(ind+2),:] = \
             np.round(np.transpose(p_out))
@@ -1156,7 +1191,55 @@ class BoltzmannMachine(object):
                           num_chains, 
                           reshape_to = [self.side, self.side], 
                           save_to_path = save_to_path)    
+                          
+    def assemble_image(self, mf_vals, sample_vals, num_chains, step):
+    
+        """ function to assemble sample image from consecutive
+        gibbs samples which are highly correlated."""
         
+        img = np.zeros([self.num_vars, num_chains])
+        
+        samples = np.zeros([self.num_vars, num_chains])
+        
+        num_full_steps = len(mf_vals)
+        
+        node = 0
+        
+        for gibbs_step in range(num_full_steps):
+            
+            if node == self.num_vars:
+                
+               break
+            
+            if gibbs_step % step == 0:
+                
+               if node <= self.num_vars:
+                
+                  img[node,:] = mf_vals[gibbs_step][node]
+                  
+                  samples[node,:] = sample_vals[gibbs_step][node]
+                  
+                  node +=1
+                  
+        return img,  samples   
+                          
+    def print_gibbs_conditionals(self, p_vals):
+        
+        """ function to print values of gibbs conditionals """
+        
+        num_steps = len(p_vals);
+        
+        for step_ind in range(num_steps):
+                
+            print("Gibbs step %d ------------------------"%step_ind)
+                
+            p_t = p_vals[step_ind]
+                
+            for x in range(self.num_vars):
+                
+                print("Node update %d ------ gibbs conditionals:"%x)
+                print(p_t[x])
+                
     def load_model_params(self, full_path):
         
         """ function to load saved model parameters """

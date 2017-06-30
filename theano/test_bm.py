@@ -91,19 +91,39 @@ if bool(trained_subset):
    
    test_inputs = train_images[indices,:]
    
-   #override a given num_chains
-   
-   if indices.size == 1:
+   if indices.size == 1 and (num_chains != 1):
        
-      num_chains = 1
+      use_num_chains = 1
+      
+      test_inputs = np.reshape(test_inputs,[1,len(test_inputs)])
+      
+   elif indices.size != 1 and (num_chains ==1):
+       
+      select_inds = np.random.choice(len(indices), 
+                                     num_chains, 
+                                     replace=False)  
+      
+      test_inputs = test_inputs[select_inds,:]
+      
+      use_num_chains = num_chains
        
    else:
+       
+      len_inds = len(indices)
    
-      num_chains  = len(indices)
+      if num_chains <= len_inds:
+         
+         use_num_chains = num_chains 
+          
+      else:
+         
+         use_num_chains  = len(indices)
    
 else:
     
    test_inputs = test_images
+   
+   use_num_chains = num_chains
 
 filename = "samples"
 
@@ -133,11 +153,7 @@ bm.load_model_params(full_path = path_to_params)
 start_time = timeit.default_timer()
 
 if bool(trained_subset):
-    
-   if num_chains ==1:
-       
-      test_inputs = np.reshape(test_inputs,[1,len(test_inputs)])
-
+   
    bm.test_relative_probability(inputs = test_inputs, trained= True)
 
    rand_samples = bm.np_rand_gen.binomial(n=1,p=0.5, 
@@ -150,20 +166,28 @@ if bool(trained_subset):
    
    print("------------------------------------------------------------")
    print("-------------- Computing p_tilda values --------------------")
-   print("------------------------------------------------------------")
+   print("------------------for training set--------------------------")
    print("")
+   
    is_samples = np_rand_gen.binomial(n=1, p=0.5, size = (num_is_samples, D))
    
-   bm.test_p_tilda(test_inputs, is_samples)
+   train_p_tilda, rand_p_tilda = bm.test_p_tilda(test_inputs, is_samples)
+   
+   print("p_tilda values for training inputs:")
+   print(train_p_tilda)
+   print("")
+   print("p_tilda values for randomly chosen importance samples:")
+   print(rand_p_tilda)
+   print("")
    
 ## init_with_dataset overrides trained_subset option
 if not init_with_dataset:
     
-   test_inputs = None   
+   test_inputs = None
    
 if mf_sampler:
 
-   bm.sample_from_mf_approx(num_chains   = num_chains, 
+   bm.sample_from_mf_approx(num_chains   = use_num_chains, 
                             num_samples  = num_samples,
                             num_steps    = num_steps,
                             save_to_path = save_to_path,
@@ -173,7 +197,7 @@ if mf_sampler:
     
 else:
 
-   bm.sample_from_bm(num_chains   = num_chains, 
+   bm.sample_from_bm(num_chains   = use_num_chains, 
                      num_samples  = num_samples,
                      num_steps    = num_steps,
                      save_to_path = save_to_path,
