@@ -1095,6 +1095,7 @@ class BoltzmannMachine(object):
                        num_samples,
                        num_steps,
                        save_to_path,
+                       num_burn_in,
                        test_inputs = None,
                        print_gibbs = False):
         
@@ -1138,11 +1139,14 @@ class BoltzmannMachine(object):
         (p_xi_given_x_, x_samples), updates =\
         theano.scan(self.gibbs_step_fully_visible, n_steps = num_steps)
         
-        output_vars = [p_xi_given_x_, x_samples]
+        output_vars = [p_xi_given_x_[num_burn_in:],
+                       x_samples[num_burn_in:]]
         
         get_samples = theano.function(inputs  = [],
                                       outputs = output_vars, 
                                       updates = updates)
+                                      
+        take_step = (num_steps - num_burn_in) // self.num_vars 
                                       
         for ind in range(num_samples):
             
@@ -1152,14 +1156,18 @@ class BoltzmannMachine(object):
             
                self.print_gibbs_conditionals(p_vals = p_all)
                
-            p_out, samples_out = self.assemble_image(p_all, 
-                                                     samples_all,
-                                                     num_chains,
-                                                     step = 100)
-            
-            #p_out = p_all
+            if num_steps != 1:
                
-            #samples_out = samples_all[-1]
+               p_out, samples_out = self.assemble_image(p_all, 
+                                                        samples_all,
+                                                        num_chains,
+                                                        step = take_step)
+                                                        
+            else:
+                
+               p_out       = p_all
+               
+               samples_out = samples_all[-1]
             
             # without resetting the chains are persistent
             #self.x_gibbs.set_value(init_chains)

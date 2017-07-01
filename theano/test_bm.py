@@ -64,6 +64,8 @@ arg_parser.add_argument('--use_mf_sampler', type = str, required = True)
 
 arg_parser.add_argument('--init_with_dataset', type = str, required = True)
 
+arg_parser.add_argument('--num_burn_in', type = str, required = False)
+
 FLAGS, _          = arg_parser.parse_known_args()
 
 path_to_params    = FLAGS.path_to_params
@@ -78,6 +80,14 @@ num_steps         = int(FLAGS.num_steps)
 
 mf_sampler        = bool(int(FLAGS.use_mf_sampler)) # alternatively,
 # sample from mean-field approximation
+
+if (FLAGS.num_burn_in != None) and mf_sampler:
+    
+   num_burn_in = int(FLAGS.num_burn_in)
+   
+else:
+    
+   num_burn_in = 0
 
 init_with_dataset = bool(int(FLAGS.init_with_dataset))
 
@@ -201,6 +211,7 @@ else:
                      num_samples  = num_samples,
                      num_steps    = num_steps,
                      save_to_path = save_to_path,
+                     num_burn_in  = num_burn_in,
                      test_inputs  = test_inputs)
                     
 end_time = timeit.default_timer()
