@@ -8,24 +8,24 @@ class Experiments(object):
     
   """ Add parameters of the experiments here """
     
-  exp1 ={'num_epochs'   :   '3000',
-         'batch_size'   :   '10',
+  exp1 ={'num_epochs'   :   '287',
+         'batch_size'   :   '30',
          'learning_rate':   '0.1',
          'experiment'   :   'exp1_CSS',
          'data_samples' :   '0', # 0 means that only minibatch points
                 #will contribute to the data term of Z approximation.
-         'num_samples'  :   '5000',
+         'num_samples'  :   '100',
          'resample'     :   '0',  # '0' - do not resample for each minibatch point.
          'momentum'     :   '0',
          'is_uniform'   :   '1',
          'algorithm'    :   'CSS',
          'use_gpu'      :   '0', #'1'
-         'learn_subset' :   '10'}
+         'learn_subset' :   '0'}
           
   exp2 ={'num_epochs'   :   '15',
          'batch_size'   :   '50',
          'learning_rate':   '0.05',
-         'experiment'   :   'xp2_CSS',
+         'experiment'   :   'exp2_CSS',
          'data_samples' :   '55000',# a whole training set is used to approx. Z
          'num_samples'  :   '0',
          'algorithm'    :   'CSS',
@@ -60,8 +60,18 @@ class Experiments(object):
          'algorithm'  :     'CD1',
          'use_gpu'    :     '1'}
          
+  exp6 ={'num_epochs':      '15',
+         'batch_size':      '50',
+         'learning_rate':   '0.05',
+         'experiment':      'exp2_CD1',
+         'num_steps':       '1',
+         'algorithm'  :     'CD1',
+         'num_hidden' :     '500',
+         'use_gpu'    :     '0'}       
+         
   experiments= {exp1['experiment']:exp1,
                 exp2['experiment']:exp2,
                 exp3['experiment']:exp3,
                 exp4['experiment']:exp4,
-                exp5['experiment']:exp5}
+                exp5['experiment']:exp5,
+                exp6['experiment']:exp6}

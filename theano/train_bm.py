@@ -82,6 +82,8 @@ arg_parser.add_argument('--resample', type = str, required = False)
 
 arg_parser.add_argument('--momentum', type = str, required = False)
 
+arg_parser.add_argument('--num_hidden', type = str, required = False)
+
 arg_parser.add_argument('--batch_size', type = str, required=  True)
 
 arg_parser.add_argument('--learning_rate', type = str, required = True)
@@ -113,21 +115,35 @@ if FLAGS.learn_subset != None:
     
    num_learn = int(FLAGS.learn_subset)
    
-   print("Will train on only %d randomly selected images"%num_learn)
+   if num_learn > 0 :
    
-   train_inds   = np.random.choice(range(N_train), 
-                                   num_learn,
-                                   replace=False)
+      print("Will train on only %d randomly selected images"%num_learn)
    
-   train_images = train_images[train_inds,:]
+      train_inds   = np.random.choice(range(N_train), 
+                                      num_learn,
+                                      replace=False)
    
-   N_train      = num_learn
+      train_images = train_images[train_inds,:]
    
-   assert batch_size <= num_learn
+      N_train      = num_learn
    
+      assert batch_size <= num_learn
+      
+   else:
+       
+      num_learn = None
+         
 else:
     
    num_learn = None
+   
+if FLAGS.num_hidden != None:
+
+   num_hidden = int(FLAGS.num_hidden)
+   
+else:
+    
+   num_hidden = 0
    
 if FLAGS.momentum != None:
     
@@ -162,21 +178,26 @@ if algorithm == "CD1":
     
    num_cd_steps = int(FLAGS.num_steps)
    
-   specs = (str(learning_rate),
+   specs = (num_hidden,
+            str(learning_rate),
             str(momentum),
             batch_size,
-            num_steps,
+            num_cd_steps,
             datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" ))
 
-   exp_tag = "LR%sM%sBS%dNST%d_%s"%specs
+   exp_tag = "RH%dLR%sM%sBS%dNST%d_%s"%specs
    
-   num_samples = None 
+   num_samples  = None 
    
-   data_samples    = None
+   data_samples = None
    
-   resample    = None
+   resample     = None
    
-   is_uniform  = False
+   is_uniform   = False
+   
+   mf_steps     = None
+   
+report_p_tilda = False
    
 if algorithm   == "CSS":
    
@@ -192,14 +213,15 @@ if algorithm   == "CSS":
    
    if num_samples ==0:
    
-      specs = (str(learning_rate),
+      specs = (num_hidden,
+               str(learning_rate),
                str(momentum),
                batch_size,
                num_samples,
                data_sampples,
                datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" ))
    
-      exp_tag = "LR%sM%sBS%dNS%dDATA%d_%s"%specs
+      exp_tag = "RH%dLR%sM%sBS%dNS%dDATA%d_%s"%specs
       
       resample = None
       
@@ -238,16 +260,10 @@ if algorithm   == "CSS":
       
       resample = bool(resample)
       
-report_p_tilda = False # uses pseudo likelihood by default
+   if (num_learn < 50) and (data_samples ==0) and (resample != 1):
    
-if (num_learn < 50) and (data_samples ==0) and (resample != 1):
-   
-   print("Will report p_tilda for this experiment")
-   report_p_tilda = True
-      
-else:
-       
-   print("Will report pseudo likelihoods for this experiment")
+      print("Will report p_tilda for this experiment")
+      report_p_tilda = True
    
 num_iterations = N_train // batch_size
 
@@ -262,6 +278,7 @@ import theano.tensor as T
 from   model_classes import BoltzmannMachine
 
 bm = BoltzmannMachine(num_vars        = input_dim, 
+                      num_hidden      = num_hidden,
                       training_inputs = train_images,
                       algorithm       = algorithm,
                       batch_size      = batch_size,
@@ -335,7 +352,7 @@ else:
         
    os.makedirs(exp_path)
    
-   if FLAGS.learn_subset != None:
+   if num_learn != None:
     
       np.savetxt(os.path.join(exp_path,"LEARNT_INSTANCES.dat"), train_inds)
       
@@ -358,13 +375,19 @@ for epoch_index in range(num_epochs):
     
     permuted_inds = np.random.permutation(N_train)
     
-    # put different learning_rate rules (per epoch) for now here:
+    if algorithm == "CSS":
     
-    lrate_epoch = (1.0/(1+epoch_index/100.))*learning_rate/batch_size
+       # put different learning_rate rules (per epoch) for now here:
+    
+       lrate_epoch = (1.0/(1+epoch_index/100.))*learning_rate/batch_size
       
-    # lrate_epoch = (0.9**epoch_index)*learning_rate  # 0.99
+       # lrate_epoch = (0.9**epoch_index)*learning_rate  # 0.99
     
-    # lrate_epoch  = learning_rate
+       # lrate_epoch  = learning_rate
+       
+    else:
+        
+       lrate_epoch = learning_rate
     
     if use_momentum:
     
@@ -490,13 +513,14 @@ for epoch_index in range(num_epochs):
             
         if algorithm =="CD1":
             
-           mf_sample, cd_sample = cd_sampling(list(minibatch_inds))
+           if num_hidden ==0:
+            
+              mf_sample, cd_sample = cd_sampling(list(minibatch_inds))
            
-           bm.x_gibbs.set_value(np.transpose(cd_sample)) 
+              bm.x_gibbs.set_value(np.transpose(cd_sample)) 
            
            approx_cost, p_tilda = optimize(list(minibatch_inds),
-                                           lrate_epoch,
-                                           num_samples)
+                                           lrate_epoch)
         
         avg_cost_val.append(approx_cost)
         
