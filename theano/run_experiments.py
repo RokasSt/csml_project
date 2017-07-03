@@ -7,7 +7,7 @@ import subprocess
 from experiments import Experiments
 
 ### list of experiments to run  ###
-#list_experiments = ['exp1_CSS']
+list_experiments = ['exp1_CSS']
 
 #list_experiments = ['exp2_CSS']
 
@@ -17,7 +17,9 @@ from experiments import Experiments
 
 #list_experiments = ['exp1_CD1']
 
-list_experiments = ['exp2_CD1']
+#list_experiments = ['exp2_CD1']
+
+#list_experiments = ['exp1_PCD']
 
 ###################################
                

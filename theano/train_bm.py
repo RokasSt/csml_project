@@ -172,7 +172,7 @@ if test_mode:
    
    use_momentum = False
    
-if algorithm == "CD1":
+if algorithm == "CD" or algorithm == "PCD":
     
    assert FLAGS.num_steps != None 
     
@@ -511,8 +511,8 @@ for epoch_index in range(num_epochs):
            print("Optimization step took --- %f minutes"%
            ((opt_t1 - opt_t0)/60.0))
             
-        if algorithm =="CD1":
-            
+        if algorithm =="CD" or algorithm == "PCD":
+           
            if num_hidden ==0:
             
               mf_sample, cd_sample = cd_sampling(list(minibatch_inds))

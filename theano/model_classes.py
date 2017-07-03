@@ -163,22 +163,33 @@ class BoltzmannMachine(object):
                                           
               if W is None:
                   
-                 # different W initializations: 
-        
-                 # uniform_init =\
-                 # self.np_rand_gen.uniform(-np.sqrt(3.0/(num_vars)),\
-                 # np.sqrt(3.0 / (num_vars)), size = (num_vars, num_vars))
-                 
-                 # uniform_init =\
-                 # self.np_rand_gen.uniform(-0.00000001,\
-                 # 0.00000001, size = (num_vars, num_vars))
-                 
-                 W0_init = 0.00000001*\
-                 self.np_rand_gen.normal(size = (num_vars, self.num_x2)) 
-        
-                 W0 = np.asarray(W0_init, dtype = theano.config.floatX)
-                 
+                 if self.num_hidden > 0:
+                    
+                    W0_init =\
+                    self.np_rand_gen.uniform(
+                   -4*np.sqrt(6.0/(self.num_vars+self.num_hidden)),\
+                    4*np.sqrt(6.0 /(self.num_vars + self.num_hidden)), 
+                    size = (num_vars, self.num_hidden)
+                    )
+                    
+                    W0 = np.asarray(W0_init, dtype = theano.config.floatX) 
+                    
                  if self.num_hidden == 0:
+                     
+                    # different W initializations: 
+        
+                    # W0_init =\
+                    # self.np_rand_gen.uniform(-np.sqrt(3.0/(num_vars)),\
+                    # np.sqrt(3.0 / (num_vars)), size = (num_vars, num_vars))
+                  
+                    # W0_init =\
+                    # self.np_rand_gen.uniform(-0.00000001,\
+                    # 0.00000001, size = (num_vars, num_vars))
+                 
+                    W0_init = 0.00000001*\
+                    self.np_rand_gen.normal(size = (num_vars, self.num_x2)) 
+        
+                    W0 = np.asarray(W0_init, dtype = theano.config.floatX)
               
                     W0 = (W0 + np.transpose(W0))/2.0
               
@@ -232,11 +243,18 @@ class BoltzmannMachine(object):
            
            self.var_num_samples = T.iscalar('var_num_samples')
            
-           if self.algorithm == "CD1" and self.num_hidden ==0:
+           if self.algorithm == "CD" and self.num_hidden ==0:
            
               self.x_gibbs= theano.shared(np.zeros([self.batch_size,self.num_vars],
                                           dtype=theano.config.floatX),
                                           borrow = True, name= "x_gibbs")
+                                          
+           if self.algorithm =="PCD" and self.num_hidden > 0:
+              
+              self.persistent_gibbs=\
+               theano.shared(np.ones([self.batch_size,self.num_hidden],
+                                       dtype=theano.config.floatX),
+                                      borrow = True, name= "persistent_gibbs")
               
            if self.algorithm == "CSS" and self.is_uniform  != True:
               
@@ -302,25 +320,24 @@ class BoltzmannMachine(object):
                                           
         return [sig_input, sig_output, sample]
         
-    def gibbs_step_rbm(self, x, init_type = "hidden"):
-        ''' This function implements one step of Gibbs sampling
-            for Restricted Boltzmann Machine.'''
+    def gibbs_step_rbm_hid(self, x):
+        '''This function implements one step of Gibbs sampling
+           for Restricted Boltzmann Machine starting with hidden units.'''
             
-        if init_type =="hidden":
+        sig_input1, sig_output1, sample1 = self.get_v_given_h_samples(x)
             
-           sig_input1, sig_output1, sample1 =\
-            self.get_v_given_h_samples(x)
+        sig_input2, sig_output2, sample2 = self.get_h_given_v_samples(sample1)
             
-           sig_input2, sig_output2, sample2 =\
-            self.get_h_given_v_samples(sample1)
+        return [sig_input1, sig_output1, sample1,
+                sig_input2, sig_output2, sample2]
         
-        if init_type =="visible":
+    def gibbs_step_rbm_vis(self, x):
+        ''' This function implements one step of Gibbs sampling
+            for Restricted Boltzmann Machine starting with visible units.'''
             
-           sig_input1, sig_output1, sample1 =\
-            self.get_h_given_v_samples(x)
+        sig_input1, sig_output1, sample1 = self.get_h_given_v_samples(x)
             
-           sig_input2, sig_output2, sample2 =\
-            self.get_v_given_h_samples(sample1)    
+        sig_input2, sig_output2, sample2 = self.get_v_given_h_samples(sample1)    
         
         return [sig_input1, sig_output1, sample1,
                 sig_input2, sig_output2, sample2]
@@ -394,14 +411,22 @@ class BoltzmannMachine(object):
         
         weight_term = T.log(self.var_num_samples) + self.num_vars*T.log(0.5)
         
-        if self.unique_samples:
+        if self.unique_samples and self.num_hidden ==0:
            
            approx_Z = -self.compute_energy(self.x_tilda, 
                                            self.var_num_samples*self.batch_size)
            
-        else:
+        elif (not self.unique_samples) and self.num_hidden ==0:
            
            approx_Z = -self.compute_energy(self.x_tilda, self.var_num_samples)
+           
+        elif self.unique_samples and self.num_hidden > 0:
+            
+           approx_Z = -self.compute_free_energy(self.x_tilda)
+           
+        elif (not self.unique_samples) and self.num_hidden >0:
+           
+           approx_Z = -self.compute_free_energy(self.x_tilda)
               
         approx_Z = approx_Z - weight_term
         
@@ -478,7 +503,7 @@ class BoltzmannMachine(object):
            approx_Z = max_val + T.log(T.sum(T.exp(self.approx_Z)))
            
         if (non_data_term == None) and (axis == None):
-            
+           
            approx_Z = data_term
            
            max_val  = T.max(approx_Z)
@@ -523,14 +548,26 @@ class BoltzmannMachine(object):
             
            print("Will explicitly include all training points in Z approximation")
            
-           approx_Z_data = -self.compute_energy(self.x_tilda, self.N_train)
+           if self.num_hidden == 0:
+           
+              approx_Z_data = -self.compute_energy(self.x_tilda, self.N_train)
+              
+           else:
+               
+              approx_Z_data = -self.compute_free_energy(self.x_tilda)
            
         if (self.data_samples < self.N_train) and (self.data_samples != 0):
             
            print("Will uniformly sample from training set for Z approximation")
            
-           approx_Z_data = -self.compute_energy(self.x_tilda, 
+           if self.num_hidden == 0:
+           
+              approx_Z_data = -self.compute_energy(self.x_tilda, 
                                           self.batch_size*self.data_samples)
+                                          
+           else:
+               
+              approx_Z_data = -self.compute_free_energy(self.x_tilda)
                                         
            approx_Z_data = T.reshape(approx_Z_data, [self.batch_size, self.data_samples])
            
@@ -700,29 +737,34 @@ class BoltzmannMachine(object):
         
         if self.algorithm =="CSS":
             
-           minibatch_energy_evals = self.compute_energy(self.x, self.batch_size)
+           if self.num_hidden == 0:
             
-           normalizer_term = self.add_css_approximation(minibatch_energy_evals)
-           
-        if self.algorithm =="CD1" and self.num_hidden ==0:
+              data_term = self.compute_energy(self.x, self.batch_size)
+              
+           else:
+               
+              data_term = self.compute_free_energy(self.x)
+              
+           normalizer_term = self.add_css_approximation(data_term)
+               
+        if self.algorithm =="CD" and self.num_hidden ==0:
             
-           minibatch_energy_evals = self.compute_energy(self.x, self.batch_size)
+           data_term = self.compute_energy(self.x, self.batch_size)
            
            normalizer_term = self.compute_energy(self.x_gibbs, self.batch_size)
            
            normalizer_term = -T.mean(normalizer_term)
            
-        if self.algorithm =="CD1" and self.num_hidden > 0:
+        if (self.algorithm =="PCD" or self.algorithm == "CD") and self.num_hidden > 0:
+           
+           data_term = self.compute_free_energy(self.x)
             
-           minibatch_energy_evals = self.compute_free_energy(self.x)
-            
-           normalizer_term = self.compute_energy(self.rbm_cd_samples, 
-                                                 self.batch_size)
+           normalizer_term = self.compute_free_energy(self.rbm_cd_samples)
            
            normalizer_term = -T.mean(normalizer_term)
            
         #  cost is negative log likelihood   
-        self.cost = T.mean(minibatch_energy_evals) + normalizer_term
+        self.cost = T.mean(data_term) + normalizer_term
         
     def add_cd_samples(self):
         
@@ -734,28 +776,38 @@ class BoltzmannMachine(object):
            theano.scan(self.gibbs_step_fully_visible, n_steps = self.num_cd_steps)
            
         if self.num_hidden > 0:
+           
+           if self.algorithm == "PCD":
+              
+              init_chain  = self.persistent_gibbs
+               
+           if self.algorithm == "CD":
             
-           # positive phase
-           _, _, hid_sample = self.get_h_given_v_samples(self.x)
+              # positive phase
+              _, _, hid_sample = self.get_h_given_v_samples(self.x)
 
-           init_chain = hid_sample
+              init_chain = hid_sample
           
            (
             [
-                pre_sigmoid_nvs,
-                nv_means,
-                nv_samples,
-                pre_sigmoid_nhs,
-                nh_means,
-                nh_samples
+                vis_inputs,
+                vis_outputs,
+                vis_samples,
+                hid_inputs,
+                hid_means,
+                hid_samples
             ],
             updates
            ) = theano.scan(
-            self.gibbs_step_rbm,
+            self.gibbs_step_rbm_hid,
             outputs_info=[None, None, None, None, None, init_chain],
             n_steps= self.num_cd_steps)
             
-           self.rbm_cd_samples = theano.gradient.disconnected_grad(nv_samples[-1])
+           self.updates.update(updates)
+            
+           self.hid_samples    = hid_samples[-1]
+            
+           self.rbm_cd_samples = theano.gradient.disconnected_grad(vis_samples[-1])
         
     def get_cd_samples(self): 
         
@@ -804,6 +856,10 @@ class BoltzmannMachine(object):
             ## or T.cast(lrate, dtype = theano.config.floatX) to 
             ## guarantee compatibility with GPU
             
+        if self.algorithm =="PCD" and self.num_hidden > 0:
+           
+           self.updates[self.persistent_gibbs] = self.hid_samples
+           
     def select_data(self, minibatch_set):
         
         """ function to select samples for css approximation
@@ -867,9 +923,17 @@ class BoltzmannMachine(object):
         # the result to x_bin_flip_i, instead of working in place on x_bin
         x_bin_flip_i = T.set_subtensor(x_bin[:, node_index], 1- x_bin[:, node_index])
         
-        fe_x_bin  = self.compute_energy(x_bin, self.batch_size)
+        if self.num_hidden ==0:
         
-        fe_x_bin_flip_i = self.compute_energy(x_bin_flip_i, self.batch_size)
+           fe_x_bin  = self.compute_energy(x_bin, self.batch_size)
+        
+           fe_x_bin_flip_i = self.compute_energy(x_bin_flip_i, self.batch_size)
+           
+        else:
+            
+           fe_x_bin  = self.compute_free_energy(x_bin)
+        
+           fe_x_bin_flip_i = self.compute_free_energy(x_bin_flip_i)
         
         #  mean(input dimension * log P ( xi | {x -i} ):
         self.pseudo_cost = T.mean(self.num_vars *\
@@ -903,7 +967,7 @@ class BoltzmannMachine(object):
            
               var_list = [self.x_tilda, self.minibatch_set]
            
-        if self.algorithm =="CD1":
+        if self.algorithm =="CD" or self.algorithm == "PCD":
             
            input_dict = {
             self.x  : self.train_inputs[self.minibatch_set,:],
@@ -927,7 +991,7 @@ class BoltzmannMachine(object):
             
            output_vars.append(theano.shared(0))
            
-        if self.algorithm != "CD1":
+        if self.algorithm == "CSS":
         
            var_list.append(self.var_num_samples)
            
@@ -996,12 +1060,12 @@ class BoltzmannMachine(object):
         
         cd_sampling = None
         
-        if self.algorithm == "CD1":
+        if self.algorithm == "CD" or self.algorithm == "PCD":
 
            self.add_cd_samples()
            
            if self.num_hidden ==0:
-
+              
               cd_sampling = self.get_cd_samples()
            
         if self.algorithm == "CSS" and self.mf_steps > 0: 
@@ -1050,7 +1114,13 @@ class BoltzmannMachine(object):
         """ function to compute relative, unnormalized likelihood 
         of given examples"""
         
-        return T.exp(-self.compute_energy(self.x, self.batch_size))
+        if self.num_hidden == 0:
+        
+           return T.exp(-self.compute_energy(self.x, self.batch_size))
+           
+        if self.num_hidden > 0:
+            
+           return T.exp(-self.compute_free_energy(self.x))
         
     def test_relative_probability(self, inputs, trained= True):
         
@@ -1075,10 +1145,15 @@ class BoltzmannMachine(object):
         
     def add_p_tilda(self):
         
-        """ function to compute p_tilda for explicit
-         gradient computations"""
+        """ function to compute p_tilda for explicit gradient computations"""
+         
+        if self.num_hidden == 0:
         
-        minibatch_energies = -self.compute_energy(self.x, self.batch_size)
+           minibatch_energies = -self.compute_energy(self.x, self.batch_size)
+           
+        if self.num_hidden > 0:
+            
+           minibatch_energies = -self.compute_free_energy(self.x)
         
         sample_energies = self.add_is_uni_approximation()
         
@@ -1254,7 +1329,9 @@ class BoltzmannMachine(object):
                        save_to_path,
                        num_burn_in,
                        test_inputs = None,
-                       print_gibbs = False):
+                       print_p_tilda = False,
+                       print_gibbs   = False,
+                       restricted  = False):
         
         """ function to generate images from trained 
         Boltzmann Machine (fully visible).
@@ -1288,68 +1365,101 @@ class BoltzmannMachine(object):
         
         images[0:num_chains,:] = init_chains
         
-        self.x_gibbs = theano.shared(init_chains)
-        
         theano.config.exception_verbosity = 'high'
         
-        print("Running gibbs chains ...\n")
-        (p_xi_given_x_, x_samples), updates =\
-        theano.scan(self.gibbs_step_fully_visible, n_steps = num_steps)
+        self.x_gibbs = theano.shared(init_chains, name= "x_gibbs")
         
-        output_vars = [p_xi_given_x_[num_burn_in:],
-                       x_samples[num_burn_in:]]
+        if restricted:
+           print("Running gibbs chains for RBM ...\n")
+           
+           (
+            [ _,
+              _,
+              _,
+              x_inputs,
+              p_xi_given_x_,
+              x_samples
+            ],
+            updates
+           ) = theano.scan(
+           self.gibbs_step_rbm_vis,
+           outputs_info=[None, None, None, None, None, self.x_gibbs],
+           n_steps= num_steps)
+           
+           output_vars = [p_xi_given_x_[-1], x_samples[-1]]
+           
+           updates.update({self.x_gibbs: x_samples[-1]})
+           
+        else:
+            
+           print("Running gibbs chains for BM ...\n")
+           
+           (p_xi_given_x_, x_samples), updates =\
+           theano.scan(self.gibbs_step_fully_visible, n_steps = num_steps)
+        
+           output_vars = [p_xi_given_x_[num_burn_in:],
+                          x_samples[num_burn_in:]]
+                          
+           take_step = (num_steps - num_burn_in) // self.num_vars 
         
         get_samples = theano.function(inputs  = [],
                                       outputs = output_vars, 
                                       updates = updates)
-                                      
-        take_step = (num_steps - num_burn_in) // self.num_vars 
-                                      
+        
         for ind in range(num_samples):
             
             p_all, samples_all = get_samples()
             
-            if print_gibbs:
-            
-               self.print_gibbs_conditionals(p_vals = p_all)
-               
-            if num_steps != 1:
+            if num_steps != 1 and restricted == False:
                
                p_out, samples_out = self.assemble_image(p_all, 
                                                         samples_all,
                                                         num_chains,
                                                         step = take_step)
                                                         
-            else:
+            elif num_steps ==1 and restricted == False:
                 
-               p_out       = p_all
+               p_out       = p_all[-1]
                
                samples_out = samples_all[-1]
+               
+            else:
+               
+               p_out       = p_all
+               
+               samples_out = samples_all
+               
+            if not restricted:
+                
+               p_out = np.transpose(p_out) 
             
             # without resetting the chains are persistent
             #self.x_gibbs.set_value(init_chains)
             
             print("Sample %d -- max pixel activations for %d gibbs chains:"%
             (ind, num_chains))
-            print(np.max(np.transpose(p_out), axis= 1))
+            print(np.max(p_out, axis= 1))
             print("")
             
-            is_samples = self.np_rand_gen.binomial(n=1, 
-                                                   p=0.5, 
-                                                   size = (10000, self.num_vars))
+            if print_gibbs:
+               self.print_gibbs_conditionals(p_vals = p_all)
+               
+            if print_p_tilda:   
+               is_samples = self.np_rand_gen.binomial(n=1, 
+                                                      p=0.5, 
+                                                      size =(10000, self.num_vars))
    
-            gibbs_p_tilda, rand_p_tilda = \
-            self.test_p_tilda(np.transpose(samples_out), is_samples)
+               gibbs_p_tilda, rand_p_tilda = \
+               self.test_p_tilda(np.transpose(samples_out), is_samples)
             
-            print("p_tilda values for gibbs samples:")
-            print(gibbs_p_tilda)
-            print("")
-            print("p_tilda values for randomly chosen importance samples:")
-            print(rand_p_tilda)
-            print("")
-            
-            images[num_chains*(ind+1):num_chains*(ind+2),:] = \
-            np.round(np.transpose(p_out))
+               print("p_tilda values for gibbs samples:")
+               print(gibbs_p_tilda)
+               print("")
+               print("p_tilda values for randomly chosen importance samples:")
+               print(rand_p_tilda)
+               print("")
+               
+            images[num_chains*(ind+1):num_chains*(ind+2),:] = np.round(p_out)
         
         make_raster_plots(images, 
                           num_samples, 
@@ -1412,8 +1522,14 @@ class BoltzmannMachine(object):
         with open (full_path, 'rb') as f:
         
              self.theta = cPickle.load(f)
+             
+        if self.num_hidden == True or (self.num_hidden > 0):
         
-        self.W, self.b = self.theta
+           self.W, self.b, self.bhid = self.theta
+           
+        else:
+            
+           self.W, self.b = self.theta
         
     def save_model_params(self, full_path):
         

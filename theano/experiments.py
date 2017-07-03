@@ -8,17 +8,18 @@ class Experiments(object):
     
   """ Add parameters of the experiments here """
     
-  exp1 ={'num_epochs'   :   '287',
-         'batch_size'   :   '30',
+  exp1 ={'num_epochs'   :   '100',
+         'batch_size'   :   '20',
          'learning_rate':   '0.1',
          'experiment'   :   'exp1_CSS',
          'data_samples' :   '0', # 0 means that only minibatch points
                 #will contribute to the data term of Z approximation.
-         'num_samples'  :   '100',
+         'num_samples'  :   '1000',
          'resample'     :   '0',  # '0' - do not resample for each minibatch point.
          'momentum'     :   '0',
          'is_uniform'   :   '1',
          'algorithm'    :   'CSS',
+         'num_hidden'   :   '500',
          'use_gpu'      :   '0', #'1'
          'learn_subset' :   '0'}
           
@@ -57,7 +58,7 @@ class Experiments(object):
          'learning_rate':   '0.05',
          'experiment':      'exp1_CD1',
          'num_steps':       '1',
-         'algorithm'  :     'CD1',
+         'algorithm'  :     'CD',
          'use_gpu'    :     '1'}
          
   exp6 ={'num_epochs':      '15',
@@ -65,7 +66,16 @@ class Experiments(object):
          'learning_rate':   '0.05',
          'experiment':      'exp2_CD1',
          'num_steps':       '1',
-         'algorithm'  :     'CD1',
+         'algorithm'  :     'CD',
+         'num_hidden' :     '500',
+         'use_gpu'    :     '0'}
+         
+  exp7 ={'num_epochs':      '15',
+         'batch_size':      '20',
+         'learning_rate':   '0.1',
+         'experiment':      'exp1_PCD',
+         'num_steps':       '15',
+         'algorithm'  :     'PCD',
          'num_hidden' :     '500',
          'use_gpu'    :     '0'}       
          
@@ -74,4 +84,5 @@ class Experiments(object):
                 exp3['experiment']:exp3,
                 exp4['experiment']:exp4,
                 exp5['experiment']:exp5,
-                exp6['experiment']:exp6}
+                exp6['experiment']:exp6,
+                exp7['experiment']:exp7}

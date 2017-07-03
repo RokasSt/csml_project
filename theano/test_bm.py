@@ -89,6 +89,14 @@ else:
     
    num_burn_in = 0
 
+if "RH0" in path_to_params:
+   
+   restricted = False
+   
+else:
+   
+   restricted = True 
+
 init_with_dataset = bool(int(FLAGS.init_with_dataset))
 
 split_path        = os.path.split(path_to_params)
@@ -156,6 +164,7 @@ else:
    save_to_path = os.path.join(split_path[0],filename+".jpeg")
 
 bm = BoltzmannMachine(num_vars        = D, 
+                      num_hidden      = restricted,
                       training        = False)
                       
 bm.load_model_params(full_path = path_to_params)
@@ -212,7 +221,9 @@ else:
                      num_steps    = num_steps,
                      save_to_path = save_to_path,
                      num_burn_in  = num_burn_in,
-                     test_inputs  = test_inputs)
+                     test_inputs  = test_inputs,
+                     restricted   = restricted)
+        
                     
 end_time = timeit.default_timer()
                    
