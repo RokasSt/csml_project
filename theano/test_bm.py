@@ -88,14 +88,17 @@ if (FLAGS.num_burn_in != None) and mf_sampler:
 else:
     
    num_burn_in = 0
-
-if "RH0" in path_to_params:
    
-   restricted = False
+   
+if "RH" in path_to_params:
+
+   ind0 = path_to_params.find("RH")
+   ind1 = path_to_params.find("LR")
+   num_hidden = int(path_to_params[ind0+2:ind1])
    
 else:
-   
-   restricted = True 
+    
+   num_hidden = 0
 
 init_with_dataset = bool(int(FLAGS.init_with_dataset))
 
@@ -164,9 +167,9 @@ else:
    save_to_path = os.path.join(split_path[0],filename+".jpeg")
 
 bm = BoltzmannMachine(num_vars        = D, 
-                      num_hidden      = restricted,
+                      num_hidden      = num_hidden,
                       training        = False)
-                      
+      
 bm.load_model_params(full_path = path_to_params)
 
 start_time = timeit.default_timer()
@@ -190,7 +193,9 @@ if bool(trained_subset):
    
    is_samples = np_rand_gen.binomial(n=1, p=0.5, size = (num_is_samples, D))
    
-   train_p_tilda, rand_p_tilda = bm.test_p_tilda(test_inputs, is_samples)
+   train_p_tilda, rand_p_tilda = bm.test_p_tilda(test_inputs, 
+                                                 is_samples,
+                                                 training = False)
    
    print("p_tilda values for training inputs:")
    print(train_p_tilda)
@@ -206,12 +211,12 @@ if not init_with_dataset:
    
 if mf_sampler:
 
-   bm.sample_from_mf_approx(num_chains   = use_num_chains, 
-                            num_samples  = num_samples,
-                            num_steps    = num_steps,
-                            save_to_path = save_to_path,
-                            test_inputs  = test_inputs,
-                            save_mf_params = True)
+   bm.sample_from_mf_dist(num_chains   = use_num_chains, 
+                          num_samples  = num_samples,
+                          num_steps    = num_steps,
+                          save_to_path = save_to_path,
+                          test_inputs  = test_inputs,
+                          save_mf_params = True)
     
     
 else:
@@ -221,8 +226,7 @@ else:
                      num_steps    = num_steps,
                      save_to_path = save_to_path,
                      num_burn_in  = num_burn_in,
-                     test_inputs  = test_inputs,
-                     restricted   = restricted)
+                     test_inputs  = test_inputs)
         
                     
 end_time = timeit.default_timer()

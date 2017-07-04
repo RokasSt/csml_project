@@ -8,8 +8,8 @@ class Experiments(object):
     
   """ Add parameters of the experiments here """
     
-  exp1 ={'num_epochs'   :   '100',
-         'batch_size'   :   '20',
+  exp1 ={'num_epochs'   :   '3000',
+         'batch_size'   :   '10',
          'learning_rate':   '0.1',
          'experiment'   :   'exp1_CSS',
          'data_samples' :   '0', # 0 means that only minibatch points
@@ -21,7 +21,7 @@ class Experiments(object):
          'algorithm'    :   'CSS',
          'num_hidden'   :   '500',
          'use_gpu'      :   '0', #'1'
-         'learn_subset' :   '0'}
+         'learn_subset' :   '10'}
           
   exp2 ={'num_epochs'   :   '15',
          'batch_size'   :   '50',
@@ -32,16 +32,18 @@ class Experiments(object):
          'algorithm'    :   'CSS',
          'use_gpu'      :   '1'}
          
-  exp3 ={'num_epochs':      '15',
-         'batch_size':      '50',
-         'learning_rate':   '0.05',
+  exp3 ={'num_epochs':      '1500',
+         'batch_size':      '10',
+         'learning_rate':   '0.1',
          'experiment'   :   'exp1_CSS_MF',
-         'data_samples' :   '55000',
-         'num_samples'  :   '1000',
-         'mf_steps'     :   '0',
-         'resample'     :   '0',# whether to resample for each minibatch instance if num_samples != 0
+         'data_samples' :   '0',
+         'num_samples'  :   '200',
+         'mf_steps'     :   '200',
+         'resample'     :   '0',
          'algorithm'    :   'CSS',
-         'use_gpu'    :     '1'}
+         'num_hidden'   :   '0',
+         'use_gpu'      :   '0',
+         'learn_subset' :   '10'}
          
   exp4 ={'num_epochs':      '15',
          'batch_size':      '50',

@@ -26,7 +26,7 @@ mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 
 report_step          = 1
 
-test_mode            = False
+test_grad_mode       = False
 
 save_images          = True
 
@@ -41,6 +41,8 @@ test_comp_energies   = False
 save_init_weights    = True
 
 gen_samples          = False
+
+num_samples_coeff    = 1.0
 
 test_images      = np.round(mnist.test.images)
 
@@ -163,7 +165,7 @@ else:
    use_momentum = False
    momentum     = 0.0
    
-if test_mode:
+if test_grad_mode:
     
    ## currently test_mode carries out 
    ## tests on gradient computation only
@@ -247,7 +249,8 @@ if algorithm   == "CSS":
        
       resample = int(FLAGS.resample)
        
-      specs = (str(learning_rate),
+      specs = (num_hidden,
+               str(learning_rate),
                str(momentum),
                batch_size,
                num_samples,
@@ -256,7 +259,7 @@ if algorithm   == "CSS":
                mf_steps,
                datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" ))
    
-      exp_tag = "LR%sM%sBS%dNS%dRS%dDATA%dMF%d_%s"%specs
+      exp_tag = "RH%dLR%sM%sBS%dNS%dRS%dDATA%dMF%d_%s"%specs
       
       resample = bool(resample)
       
@@ -264,7 +267,7 @@ if algorithm   == "CSS":
    
       print("Will report p_tilda for this experiment")
       report_p_tilda = True
-   
+
 num_iterations = N_train // batch_size
 
 losses = []
@@ -290,7 +293,7 @@ bm = BoltzmannMachine(num_vars        = input_dim,
                       mf_steps        = mf_steps,
                       use_momentum    = use_momentum,
                       report_p_tilda  = report_p_tilda,
-                      test_mode       = test_mode)
+                      test_mode       = test_grad_mode)
                       
 if test_add_complements:
     
@@ -338,7 +341,7 @@ elif test_comp_energies:
    
    sys.exit()
    
-elif test_mode:
+elif test_grad_mode:
     
    print("Testing mode")
    cd_sampling, optimize = bm.add_graph()
@@ -404,38 +407,29 @@ for epoch_index in range(num_epochs):
         minibatch_inds = permuted_inds[batch_size*i:batch_size*(i+1)]
         
         if algorithm =="CSS":
+           ### thoughts on manipulating number of samples during training 
+           if num_samples_coeff != 1.0:
             
-           #if (epoch_index > 0) and (epoch_index%1000 == 0):
+              if (epoch_index > 0) and (i%1000 == 0):
               
-              #if num_samples > 10:
+                 if num_samples > 10:
               
-               #  num_samples = int(0.1*num_samples)
+                    num_samples = int(num_samples_coeff*num_samples)
               
-               #  print("Decreasing number of samples to %d"%bm.num_samples)
-              
+                    print("Decreasing number of samples to %d"%bm.num_samples)
+           ###########   
            if (num_samples > 0) and (is_uniform != True):
                
-              if bool(mf_steps):
-                 print("Updating MF parameters")
+              if mf_steps > 0:
+                 print("Updating MF parameters ...")
                  mf_t0 = timeit.default_timer()
               
                  bm.do_mf_updates(num_steps = mf_steps)
               
                  mf_t1 = timeit.default_timer()
-                 print("4 steps of MF updates took --- %f"%
-                 ((mf_t1 -mf_t0)/60.0))
-              
-              else:
-                  
-                 # sample with different probabilities 
-                 reinit_mf = bm.np_rand_gen.uniform(0,1,\
-                 size = (bm.num_vars, bm.num_samples))
-        
-                 reinit_mf = np.asarray(reinit_mf, 
-                                        dtype = theano.config.floatX)
-              
-                 bm.mf_params.set_value(reinit_mf)
-              
+                 print("%d steps of MF updates took --- %f minutes"%
+                 (mf_steps,(mf_t1 -mf_t0)/60.0))
+                 
            opt_t0 = timeit.default_timer()
            ###
            if data_samples > 0:
@@ -459,40 +453,31 @@ for epoch_index in range(num_epochs):
               sampling_var = np.asarray(is_samples, 
                                         dtype = theano.config.floatX)
               
-              if test_mode:
-                      
+              if test_grad_mode:
                  t0 = timeit.default_timer()
-                 
                  approx_cost, p_tilda = optimize(sampling_var, 
                                                  list(minibatch_inds),
                                                  lrate_epoch,
                                                  num_samples)
-                                                  
                  t1 = timeit.default_timer()  
                  print("Gradient computation with implementation 1 took"+\
                  " --- %f minutes"%((t1 - t0)/60.0))
-                 
                  W_implicit = np.asarray(bm.W.get_value())
-              
                  b_implicit = np.asarray(bm.b.get_value())
-                 
                  t0 = timeit.default_timer()
                  bm.test_grad_computations(is_samples, list(minibatch_inds))
                  t1 = timeit.default_timer()
                  print("Gradient computation with implementation 2 took "+\
                  "--- %f minutes"%((t1 - t0)/60.0))
-              
                  W_explicit = np.asarray(bm.W.get_value())
-              
                  b_explicit = np.asarray(bm.b.get_value())
-                 
                  print("Equivalence of W updates in two implementations:")
                  print((np.round(W_implicit,12) == np.round(W_explicit,12)).all())
                  print("Equivalence of b updates in two implementations:")
                  print((np.round(b_implicit,12) == np.round(b_explicit,12)).all())
                  sys.exit()
-                 
-           if use_momentum:
+           
+           if use_momentum and is_uniform:
               
               approx_cost, p_tilda = optimize(sampling_var, 
                                               list(minibatch_inds),
@@ -500,12 +485,26 @@ for epoch_index in range(num_epochs):
                                               momentum_epoch,
                                               num_samples)
               
-           else:
+           elif (not use_momentum) and is_uniform:
               
               approx_cost, p_tilda = optimize(sampling_var, 
                                               list(minibatch_inds),
                                               lrate_epoch,
-                                              num_samples)   
+                                              num_samples) 
+                                              
+           elif use_momentum and (not is_uniform):
+               
+              approx_cost, p_tilda = optimize(list(minibatch_inds),
+                                              lrate_epoch,
+                                              momentum_epoch,
+                                              num_samples)
+                                              
+           elif (not use_momentum) and (not is_uniform):
+              
+              approx_cost, p_tilda = optimize(list(minibatch_inds),
+                                              lrate_epoch,
+                                              num_samples) 
+              
            ###
            opt_t1 = timeit.default_timer()
            print("Optimization step took --- %f minutes"%

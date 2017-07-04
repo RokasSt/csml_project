@@ -258,14 +258,24 @@ class BoltzmannMachine(object):
               
            if self.algorithm == "CSS" and self.is_uniform  != True:
               
-              init_mf = self.np_rand_gen.uniform(0,1, 
-              size = (self.num_vars, self.num_samples))
+              init_mf_vis = self.np_rand_gen.uniform(0, 1, size =(self.num_vars,1))
               
-              init_mf = np.asarray(init_mf, dtype = theano.config.floatX)
+              init_mf_vis = np.asarray(init_mf_vis, dtype = theano.config.floatX)
               
-              self.mf_params = theano.shared(init_mf, 
-                                             name= "mf_params", 
-                                             borrow= True)
+              self.mf_vis_params = theano.shared(init_mf_vis, 
+                                                 name= "mf_vis_params", 
+                                                 borrow= True)
+                                                
+              if self.num_hidden > 0:
+                
+                 init_mf_hid = self.np_rand_gen.uniform(0, 1, size =(self.num_hidden,1))
+              
+                 init_mf_hid = np.asarray(init_mf_hid, dtype = theano.config.floatX)
+              
+                 self.mf_hid_params = theano.shared(init_mf_hid, 
+                                                    name= "mf_hid_params", 
+                                                    borrow= True)
+                  
                                              
     def energy_function(self, x):
     
@@ -361,7 +371,7 @@ class BoltzmannMachine(object):
                
            print("Samples will be drawn for each instance in a minibatch")
            [list_mf_samples, weight_term], updates =\
-           theano.scan(self.get_mf_samples, n_steps = self.batch_size)
+           theano.scan(self.get_mf_samples(data=False), n_steps = self.batch_size)
          
            self.updates.update(updates)
          
@@ -370,10 +380,18 @@ class BoltzmannMachine(object):
            weight_term    = theano.gradient.disconnected_grad(weight_term)
         
            weight_term    = T.log(self.var_num_samples*weight_term)
+           
+           if self.num_hidden ==0:
         
-           approx_Z_mf, updates = \
-           theano.scan(lambda i : -self.compute_energy(list_mf_samples[i],\
-           self.var_num_samples),sequences = [T.arange(self.batch_size)])
+              approx_Z_mf, updates = \
+              theano.scan(lambda i : -self.compute_energy(list_mf_samples[i],\
+              self.var_num_samples),sequences = [T.arange(self.batch_size)])
+        
+           if self.num_hidden > 0:
+               
+              approx_Z_mf, updates = \
+              theano.scan(lambda i : -self.compute_free_energy(list_mf_samples[i]),\
+              sequences = [T.arange(self.batch_size)])
         
            self.updates.update(updates)
         
@@ -389,15 +407,22 @@ class BoltzmannMachine(object):
                
            print("Samples will be shared between instances in a minibatch")
               
-           mf_samples, weight_term = self.get_mf_samples()
+           mf_samples, weight_term = self.get_mf_samples(data= False)
               
            mf_samples  = theano.gradient.disconnected_grad(mf_samples)
         
            weight_term = theano.gradient.disconnected_grad(weight_term)
         
            weight_term = T.log(self.var_num_samples*weight_term)
+           
+           if self.num_hidden == 0:
               
-           approx_Z_mf = -self.compute_energy(mf_samples, self.var_num_samples)
+              approx_Z_mf = -self.compute_energy(mf_samples, 
+                                                 self.var_num_samples)
+                                                 
+           if self.num_hidden > 0:
+              
+              approx_Z_mf = -self.compute_free_energy(mf_samples)
               
            approx_Z_mf = approx_Z_mf - weight_term
            
@@ -615,72 +640,112 @@ class BoltzmannMachine(object):
            
         return approx_Z
         
-    def get_mf_evaluations(self, samples):
+    def get_mf_evaluations(self, samples, mf_params):
         
         """ function to get evaluations of mean field distribution"""
         
-        evals = (self.mf_params**samples)*((1.0 - self.mf_params)**(1- samples))
+        evals = (mf_params**samples)*\
+        ((1.0 -  mf_params)**(1- samples))
         
-        evals = T.prod(evals, axis=0) # axis= 0 : node index, axis=1 : nth datum
-        
-        #evals = 1.0/(0.000000001 + evals)
-        
-        evals = 1.0 / evals
+        evals = T.prod(evals, axis=0) # axis= 0: node index, axis=1: nth datum
         
         return evals
         
-    def get_mf_samples(self):
+    def get_mf_samples(self, data = True):
         
-        """ function to sample from mean-field distribution """
+        """ function to sample visible units from mean-field distribution"""
+        
+        if not data:
+           
+           mf_vals =  T.tile(self.mf_vis_params,(1,self.var_num_samples))
+           
+        else:
+            
+           mf_vals = self.mf_vis_params
         
         samples = self.theano_rand_gen.binomial(size= (self.num_vars,
                                                        self.var_num_samples),
                                                 n   = 1, 
-                                                p   = self.mf_params,
+                                                p   = mf_vals,
                                                 dtype=theano.config.floatX)
         
-        importance_weights =  self.get_mf_evaluations(samples)
+        q_vals =  self.get_mf_evaluations(samples, mf_vals)
         
-        return T.transpose(samples), importance_weights
+        return T.transpose(samples), q_vals
         
     def add_mf_updates(self):
         
         """ function to add mean-field updates"""
         
-        self.mf_updates, _ = theano.scan(lambda i: self.sigmoid_output(self.mf_params,i),
+        if self.num_hidden == 0:
+        
+           self.mf_updates, _ =\
+            theano.scan(lambda i: self.sigmoid_update(self.mf_vis_params,i),
                                          sequences = [T.arange(self.num_vars)])
-                                   
+                                         
+        elif self.num_hidden > 0:
+            
+           self.mf_vis_updates = self.sigmoid_update_vis(self.mf_hid_params)
+           
+           self.mf_hid_updates = self.sigmoid_update_hid(self.mf_vis_params)
+           
+           # damp high oscillations:
+           self.mf_vis_updates = 0.02*self.mf_vis_params + 0.98*self.mf_vis_updates
+           
+           self.mf_hid_updates = 0.02*self.mf_hid_params + 0.98*self.mf_hid_updates
+           #####
+           
     def do_mf_updates(self, num_steps, report = False):
         
         """ function to implement mean-field updates for approximation
-        of data distribution"""
+        of model (equilibrium) distribution"""
         
         output_vars =[]
         
-        if report:
-            
-           mean_mf_params = T.mean(T.log(self.mf_params))
+        if self.num_hidden == 0:
+        
+           if report:
+              
+              output_vars.append(T.mean(T.log(self.mf_vis_params)))
            
-           output_vars.append(mean_mf_params)
-           
-        update_funct = theano.function(inputs  =[],
-                                       outputs = output_vars,
-                                       updates = [(self.mf_params,\
-                                       self.mf_updates)])
+           update_funct = theano.function(inputs  =[],
+                                          outputs = output_vars,
+                                          updates = [(self.mf_vis_params,\
+                                          self.mf_updates)])
                                        
-        for step in range(num_steps):
+           for step in range(num_steps):
+               if report:
+                  avg_log_mf = update_funct() 
+                  print("Step %d: average value of MF parameter --- %f"%
+                  (step, avg_log_mf[0]))
+               else:
+                  update_funct()
+        
+        elif self.num_hidden > 0: 
             
-            if report:
+           if report:
                
-               avg_log_mf = update_funct() 
-               
-               print("Step %d: average value of MF parameter --- %f"%
-               (step, avg_log_mf[0]))
-               
-            else:
-            
-               update_funct()
-            
+              output_vars.append(T.mean(T.log(self.mf_vis_params)))
+              
+              output_vars.append(T.mean(T.log(self.mf_hid_params)))
+              
+           updates = OrderedDict([(self.mf_vis_params, self.mf_vis_updates),
+                                  (self.mf_hid_params, self.mf_hid_updates)])
+           
+           update_funct = theano.function(inputs  = [],
+                                          outputs = output_vars,
+                                          updates = updates)
+                                          
+           for step in range(num_steps):
+               if report:
+                  avg_log_vis, avg_log_hid = update_funct() 
+                  print("Step %d: average value of visible MF parameter --- %f"%
+                  (step, avg_log_vis))
+                  print("Step %d: average value of hidden MF parameter --- %f"%
+                  (step, avg_log_hid))
+               else:
+                  update_funct()
+              
     def compute_energy(self, x, num_terms):
         
         """ function to evaluate energies over a given set of inputs
@@ -959,14 +1024,22 @@ class BoltzmannMachine(object):
            
               var_list = [self.sample_set, self.minibatch_set]
               
-           if (self.data_samples == 0) and self.is_uniform:
+           elif (self.data_samples == 0) and self.is_uniform:
                
               input_dict = {
                self.x      : self.train_inputs[self.minibatch_set,:]
               }
            
               var_list = [self.x_tilda, self.minibatch_set]
+              
+           elif (self.data_samples ==0) and (not self.is_uniform):
+              
+              input_dict = {
+               self.x      : self.train_inputs[self.minibatch_set,:]
+              }
            
+              var_list = [self.minibatch_set] 
+              
         if self.algorithm =="CD" or self.algorithm == "PCD":
             
            input_dict = {
@@ -1003,16 +1076,34 @@ class BoltzmannMachine(object):
         
         return opt_step
          
-    def sigmoid_output(self, x, var_index):
+    def sigmoid_update(self, x, var_index):
         
-        """ function to compute the sigmoid output for the Gibbs step
-        for fully visible Boltzmann Machine.
-        """
+        """ function to compute the fixed point update for the Gibbs step
+        for fully visible Boltzmann Machine."""
         
         sigmoid_activation = self.b[self.node_indices[var_index]] +\
          2*(T.dot(self.W[self.node_indices[var_index],:],x) - 
          self.W[self.node_indices[var_index],var_index]*x[var_index,:])
          
+        return T.nnet.sigmoid(sigmoid_activation)
+        
+    def sigmoid_update_vis(self, x):
+        
+        """ function to compute the fixed point updates for the mean-field
+        parameters of visible units of Restricted Boltzmann Machine """
+        
+        sigmoid_activation = T.reshape(self.b,[self.num_vars,1]) + T.dot(self.W, x)
+        
+        return T.nnet.sigmoid(sigmoid_activation)
+        
+    def sigmoid_update_hid(self,x):
+        
+        """ function to compute the fixed point updates for the mean-field
+        parameters of hidden units of Restricted Boltzmann Machine """
+        
+        sigmoid_activation = T.reshape(self.bhid, [self.num_hidden,1]) +\
+        T.dot(T.transpose(self.W),x)
+        
         return T.nnet.sigmoid(sigmoid_activation)
         
     def gibbs_update_node(self, target_node):
@@ -1021,7 +1112,7 @@ class BoltzmannMachine(object):
         visible Boltzmann Machine
         """
         
-        p_xi_given_x_ = self.sigmoid_output(T.transpose(self.x_gibbs),target_node)
+        p_xi_given_x_ = self.sigmoid_update(T.transpose(self.x_gibbs),target_node)
         
         samples = self.theano_rand_gen.binomial(size = tuple(p_xi_given_x_.shape),
                                                 n    = 1, 
@@ -1086,7 +1177,7 @@ class BoltzmannMachine(object):
  
         return cd_sampling, optimize
         
-    def test_p_tilda(self, test_inputs, random_inputs):
+    def test_p_tilda(self, test_inputs, random_inputs, training):
         
         """ function to test p_tilda values with trained Boltzmann Machine"""
         
@@ -1096,7 +1187,7 @@ class BoltzmannMachine(object):
         
         self.var_num_samples = self.num_samples
         
-        self.add_p_tilda()
+        self.add_p_tilda(training = training)
         
         var_list = [self.x, self.x_tilda]
         
@@ -1143,7 +1234,7 @@ class BoltzmannMachine(object):
            
         print(probs)
         
-    def add_p_tilda(self):
+    def add_p_tilda(self, training = True):
         
         """ function to compute p_tilda for explicit gradient computations"""
          
@@ -1154,8 +1245,18 @@ class BoltzmannMachine(object):
         if self.num_hidden > 0:
             
            minibatch_energies = -self.compute_free_energy(self.x)
+           
+        if self.is_uniform and training:
         
-        sample_energies = self.add_is_uni_approximation()
+           sample_energies = self.add_is_uni_approximation()
+           
+        elif (not self.is_uniform) and training:
+            
+           sample_energies = self.add_mf_approximation()
+           
+        elif (not training):
+            
+           sample_energies = self.add_is_uni_approximation()
         
         all_energies = T.concatenate([minibatch_energies, sample_energies])
         
@@ -1181,7 +1282,7 @@ class BoltzmannMachine(object):
         """ function to test gradient computations explicitly
         (implementation 2) """
         
-        self.add_p_tilda()
+        self.add_p_tilda(training = False)
         
         do_updates = OrderedDict()
         
@@ -1246,39 +1347,72 @@ class BoltzmannMachine(object):
                                      
         test_grads(samples, training_points)
         
-    def sample_from_mf_approx(self, 
-                              num_chains, 
-                              num_samples,
-                              num_steps,
-                              save_to_path,
-                              test_inputs    = None,
-                              save_mf_params = True):
+    def sample_from_mf_dist(self, 
+                            num_chains, 
+                            num_samples,
+                            num_steps,
+                            save_to_path,
+                            test_inputs    = None,
+                            save_mf_params = True):
         
         """ function to sample from mean-field approximation of trained
         fully visible Boltzmann Machine."""
-        
-        images = np.zeros([num_chains*num_samples, self.num_vars])
         
         self.num_samples = num_chains
         
         self.var_num_samples = self.num_samples
         
         if type(test_inputs) is  np.ndarray:
-           print("Will initialize MF parameters with input images") 
-           init_mf = np.transpose(test_inputs)
+            
+           print("Will initialize MF parameters for visible units"+\
+           " with input images")
+           get_points = self.np_rand_gen.choice(test_inputs.shape[0], 
+                                                num_chains, 
+                                                False)
+           
+           init_mf_vis = test_inputs[get_points,:]
+           
+           init_with_images = True
+           
+           images = np.zeros([num_chains*num_samples+num_chains, self.num_vars])
+        
+           images[0:num_chains,:] = init_mf_vis
+           
+           init_mf_vis = np.transpose(init_mf_vis)
             
         else:
+            
+           images = np.zeros([num_chains*num_samples, self.num_vars])
            
-           print("Will initialize MF parameters with uniform distribution")
-           init_mf = self.np_rand_gen.uniform(0,1, 
-           size = (self.num_vars, self.num_samples))
+           print("Will initialize MF parameters for visible units"+\
+            " with uniform distribution")
+           init_mf_vis = self.np_rand_gen.uniform(0, 
+                                                  1, 
+                                                  size =(self.num_vars, num_chains))
+                                                  
+           init_with_images = False
               
-        init_mf = np.asarray(init_mf, dtype = theano.config.floatX)
+        init_mf_vis = np.asarray(init_mf_vis, dtype = theano.config.floatX)
               
-        self.mf_params = theano.shared(init_mf, 
-                                       name= "mf_params", 
-                                       borrow= True)
-                                       
+        self.mf_vis_params = theano.shared(init_mf_vis, 
+                                           name= "mf_vis_params", 
+                                           borrow= True)
+        
+        if self.num_hidden > 0:
+           
+           print("Will initialize MF parameters for RBM hidden units"+\
+           " with uniform distribution")
+           
+           init_mf_hid = self.np_rand_gen.uniform(0,
+                                                  1, 
+                                                  size = (self.num_hidden, num_chains))
+              
+           init_mf_hid = np.asarray(init_mf_hid, dtype = theano.config.floatX)
+              
+           self.mf_hid_params = theano.shared(init_mf_hid, 
+                                              name= "mf_hid_params", 
+                                              borrow= True)
+           
         self.add_mf_updates()
         
         self.do_mf_updates(num_steps = num_steps, report = True)
@@ -1293,34 +1427,32 @@ class BoltzmannMachine(object):
            
            mf_file = file(mf_file, 'wb')
            
-           cPickle.dump(self.mf_params, 
+           cPickle.dump(self.mf_vis_params, 
                         mf_file, 
                         protocol=cPickle.HIGHEST_PROTOCOL)
         
            mf_file.close()
         
-        mf_samples, sample_probs = self.get_mf_samples()
+        mf_samples, sample_probs = self.get_mf_samples(data = True)
         
         get_samples = theano.function(inputs  = [],
                                       outputs = [sample_probs, 
                                                  mf_samples,
-                                                 self.mf_params])
+                                                 self.mf_vis_params])
                                       
-        print("Sampling")      
-                                
+        print("Sampling...")
         for ind in range(num_samples):
             
             p_out, samples_out, mf_vals = get_samples()
             
             images[num_chains*ind:num_chains*(ind+1),:] = samples_out
-            #np.round(np.transpose(mf_vals))
-        
+
         make_raster_plots(images, 
                           num_samples, 
                           num_chains, 
                           reshape_to = [self.side, self.side], 
                           save_to_path = save_to_path,
-                          test_images = False)    
+                          init_with_images = init_with_images)    
     
     def sample_from_bm(self,
                        num_chains, 
@@ -1330,8 +1462,7 @@ class BoltzmannMachine(object):
                        num_burn_in,
                        test_inputs = None,
                        print_p_tilda = False,
-                       print_gibbs   = False,
-                       restricted  = False):
+                       print_gibbs   = False):
         
         """ function to generate images from trained 
         Boltzmann Machine (fully visible).
@@ -1369,7 +1500,7 @@ class BoltzmannMachine(object):
         
         self.x_gibbs = theano.shared(init_chains, name= "x_gibbs")
         
-        if restricted:
+        if self.num_hidden > 0:
            print("Running gibbs chains for RBM ...\n")
            
            (
@@ -1410,14 +1541,14 @@ class BoltzmannMachine(object):
             
             p_all, samples_all = get_samples()
             
-            if num_steps != 1 and restricted == False:
+            if num_steps != 1 and self.num_hidden == 0:
                
                p_out, samples_out = self.assemble_image(p_all, 
                                                         samples_all,
                                                         num_chains,
                                                         step = take_step)
                                                         
-            elif num_steps ==1 and restricted == False:
+            elif num_steps ==1 and self.num_hidden == 0:
                 
                p_out       = p_all[-1]
                
@@ -1429,7 +1560,7 @@ class BoltzmannMachine(object):
                
                samples_out = samples_all
                
-            if not restricted:
+            if self.num_hidden == 0:
                 
                p_out = np.transpose(p_out) 
             
@@ -1450,7 +1581,9 @@ class BoltzmannMachine(object):
                                                       size =(10000, self.num_vars))
    
                gibbs_p_tilda, rand_p_tilda = \
-               self.test_p_tilda(np.transpose(samples_out), is_samples)
+               self.test_p_tilda(np.transpose(samples_out), 
+                                 is_samples,
+                                 training = False)
             
                print("p_tilda values for gibbs samples:")
                print(gibbs_p_tilda)
@@ -1519,8 +1652,9 @@ class BoltzmannMachine(object):
         
         """ function to load saved model parameters """
         
+        print("Loading model parameters from %s"%full_path)
         with open (full_path, 'rb') as f:
-        
+             
              self.theta = cPickle.load(f)
              
         if self.num_hidden == True or (self.num_hidden > 0):

@@ -63,7 +63,7 @@ def make_raster_plots(images,
                       num_chains, 
                       reshape_to, 
                       save_to_path,
-                      test_images = True):
+                      init_with_images = True):
     
     """ function to generate a raster of image plots 
     
@@ -83,7 +83,7 @@ def make_raster_plots(images,
 
     num_cols =  num_chains
     
-    if test_images:
+    if init_with_images:
     
        assert images.shape[0] == num_rows*num_cols + num_cols
        
@@ -104,7 +104,7 @@ def make_raster_plots(images,
     
     for image_index in range(images.shape[0]):
         
-        if test_images:
+        if init_with_images:
         
            if image_index <= num_chains-1:
         
