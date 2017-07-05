@@ -1177,6 +1177,28 @@ class BoltzmannMachine(object):
  
         return cd_sampling, optimize
         
+    def test_pseudo_likelihood(self, test_inputs, num_steps):
+        
+        """ function to test pseudo_likelihood with trained Boltzmann Machine"""
+        
+        self.updates = OrderedDict()
+        
+        self.add_pseudo_cost_measure()
+        
+        cost_estimate = []
+        
+        get_measure = theano.function(inputs = [self.x],
+                                      outputs= self.pseudo_cost,
+                                      updates= self.updates)
+                                      
+        for step in range(num_steps):
+            
+             cost_estimate.append(get_measure(test_inputs))
+             
+        cost_estimate = sum(cost_estimate)/float(num_steps)
+        
+        return cost_estimate
+                                      
     def test_p_tilda(self, test_inputs, random_inputs, training):
         
         """ function to test p_tilda values with trained Boltzmann Machine"""
@@ -1460,7 +1482,7 @@ class BoltzmannMachine(object):
                        num_steps,
                        save_to_path,
                        num_burn_in,
-                       test_inputs = None,
+                       test_inputs   = None,
                        print_p_tilda = False,
                        print_gibbs   = False):
         
@@ -1532,7 +1554,11 @@ class BoltzmannMachine(object):
                           x_samples[num_burn_in:]]
                           
            take_step = (num_steps - num_burn_in) // self.num_vars 
-        
+           
+           if take_step == 0:
+               
+              take_step = 1
+           
         get_samples = theano.function(inputs  = [],
                                       outputs = output_vars, 
                                       updates = updates)
@@ -1565,7 +1591,8 @@ class BoltzmannMachine(object):
                p_out = np.transpose(p_out) 
             
             # without resetting the chains are persistent
-            #self.x_gibbs.set_value(init_chains)
+            # (self.x_gibbs are modified continuously)
+            # self.x_gibbs.set_value(init_chains)
             
             print("Sample %d -- max pixel activations for %d gibbs chains:"%
             (ind, num_chains))

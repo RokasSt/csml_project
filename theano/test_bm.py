@@ -60,7 +60,7 @@ arg_parser.add_argument('--trained_subset', type = str, required = True)
 
 arg_parser.add_argument('--num_steps', type = str, required = True)
 
-arg_parser.add_argument('--use_mf_sampler', type = str, required = True)
+arg_parser.add_argument('--sampler', type = str, required = True)
 
 arg_parser.add_argument('--init_with_dataset', type = str, required = True)
 
@@ -78,10 +78,9 @@ trained_subset    = int(FLAGS.trained_subset)
 
 num_steps         = int(FLAGS.num_steps)
 
-mf_sampler        = bool(int(FLAGS.use_mf_sampler)) # alternatively,
-# sample from mean-field approximation
+sampler           = FLAGS.sampler
 
-if (FLAGS.num_burn_in != None) and mf_sampler:
+if (FLAGS.num_burn_in != None) and sampler =="GIBBS":
     
    num_burn_in = int(FLAGS.num_burn_in)
    
@@ -139,22 +138,28 @@ if bool(trained_subset):
       else:
          
          use_num_chains  = len(indices)
+         
+   x_to_test_p = test_inputs
    
 else:
     
    test_inputs = test_images
    
    use_num_chains = num_chains
-
-filename = "samples"
-
-if mf_sampler:
-    
-   filename+="_mf"
    
-else:
+   x_inds = np.random.choice(test_inputs.shape[0], 10, replace = False)
+
+   x_to_test_p = test_inputs[x_inds, :]
+   
+filename = "SS%dCH%dST%d"%(num_samples, num_chains, num_steps)
+
+if sampler == "MF":
     
-   filename+="_gibbs"
+   filename+="_MF"
+   
+elif sampler == "GIBBS":
+    
+   filename+="_GIBBS"
    
 if "INIT" in split_path[1]:
     
@@ -172,44 +177,47 @@ bm = BoltzmannMachine(num_vars        = D,
       
 bm.load_model_params(full_path = path_to_params)
 
+bm.test_relative_probability(inputs = x_to_test_p, trained= True)
+
+rand_samples = bm.np_rand_gen.binomial(n=1,p=0.5, 
+                                       size = (x_to_test_p.shape[0], 784))
+              
+rand_samples = np.asarray(rand_samples, dtype = theano.config.floatX)
+   
+bm.test_relative_probability(inputs = rand_samples, trained = False)
+   
+print("------------------------------------------------------------")
+print("-------------- Computing p_tilda values --------------------")
+print("------------------for training set--------------------------")
+print("")
+   
+is_samples = np_rand_gen.binomial(n=1, p=0.5, size = (num_is_samples, D))
+   
+train_p_tilda, rand_p_tilda = bm.test_p_tilda(x_to_test_p, 
+                                              is_samples,
+                                              training = False)
+   
+print("p_tilda values for training inputs:")
+print(train_p_tilda)
+print("")
+print("p_tilda values for 10 randomly chosen importance samples:")
+print(rand_p_tilda)
+print("")
+   
+print("-------------- Computing pseudo likelihood ------------------")
+   
+pseudo_cost = bm.test_pseudo_likelihood(x_to_test_p, num_steps= 784)
+print("Stochastic approximation to pseudo likelihood ---- %f"%pseudo_cost)
+   
 start_time = timeit.default_timer()
 
-if bool(trained_subset):
-   
-   bm.test_relative_probability(inputs = test_inputs, trained= True)
-
-   rand_samples = bm.np_rand_gen.binomial(n=1,p=0.5, 
-                              size = (test_inputs.shape[0], 784))
-              
-   rand_samples = np.asarray(rand_samples, 
-                             dtype = theano.config.floatX)
-   
-   bm.test_relative_probability(inputs = rand_samples, trained = False)
-   
-   print("------------------------------------------------------------")
-   print("-------------- Computing p_tilda values --------------------")
-   print("------------------for training set--------------------------")
-   print("")
-   
-   is_samples = np_rand_gen.binomial(n=1, p=0.5, size = (num_is_samples, D))
-   
-   train_p_tilda, rand_p_tilda = bm.test_p_tilda(test_inputs, 
-                                                 is_samples,
-                                                 training = False)
-   
-   print("p_tilda values for training inputs:")
-   print(train_p_tilda)
-   print("")
-   print("p_tilda values for randomly chosen importance samples:")
-   print(rand_p_tilda)
-   print("")
-   
 ## init_with_dataset overrides trained_subset option
 if not init_with_dataset:
     
    test_inputs = None
-   
-if mf_sampler:
+#################### 
+ 
+if sampler == "MF":
 
    bm.sample_from_mf_dist(num_chains   = use_num_chains, 
                           num_samples  = num_samples,
@@ -219,7 +227,7 @@ if mf_sampler:
                           save_mf_params = True)
     
     
-else:
+elif sampler == "GIBBS":
 
    bm.sample_from_bm(num_chains   = use_num_chains, 
                      num_samples  = num_samples,
