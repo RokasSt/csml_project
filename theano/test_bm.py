@@ -161,6 +161,14 @@ elif sampler == "GIBBS":
     
    filename+="_GIBBS"
    
+if "END" in path_to_params:
+   
+   filename+="_END"
+   
+else:
+    
+   filename+="_INTER"
+   
 if "INIT" in split_path[1]:
     
    filename+="_init"
