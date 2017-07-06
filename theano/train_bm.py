@@ -138,7 +138,11 @@ if FLAGS.learn_subset != None:
 else:
     
    num_learn = None
-   
+##################################   
+num_iters = N_train // batch_size
+
+losses = []
+##################################   
 if FLAGS.num_hidden != None:
 
    num_hidden = int(FLAGS.num_hidden)
@@ -267,11 +271,11 @@ if algorithm   == "CSS":
    
       print("Will report p_tilda for this experiment")
       report_p_tilda = True
-
-num_iterations = N_train // batch_size
-
-losses = []
-
+      
+      p_tilda_all = np.zeros([num_epochs*num_iters//report_step,batch_size])
+      
+      p_t_i = 0
+      
 if bool(use_gpu):    
    print("Will attempt to use GPU")
    os.environ['THEANO_FLAGS'] = 'device=cuda'
@@ -400,7 +404,7 @@ for epoch_index in range(num_epochs):
     
     avg_cost_val = []
     
-    for i in range(num_iterations):
+    for i in range(num_iters):
         
         iter_start_time = timeit.default_timer()
     
@@ -531,7 +535,7 @@ for epoch_index in range(num_epochs):
         
         if i % report_step ==0:
             
-           print('Training epoch %d ---- Iter %d ---- cost value: %f'
+           print('Training epoch %d ---- Iter %d ---- pseudo cost value: %f'
            %(epoch_index, i, approx_cost))
            
            if report_p_tilda:
@@ -540,6 +544,10 @@ for epoch_index in range(num_epochs):
               print(p_tilda[0:batch_size])
               print("sum of these values:")
               print(np.sum(p_tilda[0:batch_size]))
+              
+              p_tilda_all[p_t_i,:] = p_tilda[0:batch_size]
+              
+              p_t_i +=1
            
         iter_end_time = timeit.default_timer()
         
@@ -550,7 +558,7 @@ for epoch_index in range(num_epochs):
     
     losses.append(avg_cost_val)
         
-    print('Training epoch %d ---- average cost value: %f'
+    print('Training epoch %d ---- average pseudo cost value: %f'
     %(epoch_index, avg_cost_val))
     
     epoch_time = timeit.default_timer()
@@ -575,26 +583,9 @@ np.savetxt(os.path.join(exp_path,"TRAIN_LOSSES.dat"), losses)
 
 np.savetxt(os.path.join(exp_path,"TRAINING_TIME.dat"), np.array([training_time]))
 
-if algorithm == "CSS" and gen_samples:
-
-   if (FLAGS.learn_subset != None) and (num_learn > 0):
-
-      for file_tag in ['INIT','TRAINED']:
-          
-          if file_tag == 'TRAINED':
-              
-             print("Testing trained model -----------------------------")
-             
-          if file_tag == 'INIT':
-              
-            print("Testing initialized model --------------------------")
-
-          command_string =("python test_bm.py "+\
-          "--path_to_params %s/%s_PARAMS.model "+\
-          "--num_samples 8 --num_chains %d --trained_subset 1"+\
-          " --num_steps 100 --use_mf_sampler 1")%(exp_path,file_tag, num_learn)
-
-          subprocess.call(command_string ,shell=True)
+if report_p_tilda:
+    
+   np.savetxt(os.path.join(exp_path,"TRAIN_P_TILDA.dat"), p_tilda_all)
 
 
     

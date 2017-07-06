@@ -1558,6 +1558,8 @@ class BoltzmannMachine(object):
            if take_step == 0:
                
               take_step = 1
+              
+           updates = OrderedDict()
            
         get_samples = theano.function(inputs  = [],
                                       outputs = output_vars, 
@@ -1580,7 +1582,7 @@ class BoltzmannMachine(object):
                
                samples_out = samples_all[-1]
                
-            else:
+            elif self.num_hidden > 0:
                
                p_out       = p_all
                

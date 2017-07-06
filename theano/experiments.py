@@ -32,18 +32,18 @@ class Experiments(object):
          'algorithm'    :   'CSS',
          'use_gpu'      :   '1'}
          
-  exp3 ={'num_epochs'   :   '1500',
-         'batch_size'   :   '10',
+  exp3 ={'num_epochs'   :   '50',
+         'batch_size'   :   '50',
          'learning_rate':   '0.05',
          'experiment'   :   'exp1_CSS_MF',
          'data_samples' :   '0',
-         'num_samples'  :   '2500',
+         'num_samples'  :   '500',
          'mf_steps'     :   '200',
          'resample'     :   '0',
          'algorithm'    :   'CSS',
          'num_hidden'   :   '500',
          'use_gpu'      :   '0',
-         'learn_subset' :   '10'}
+         'learn_subset' :   '0'}
          
   exp4 ={'num_epochs':      '15',
          'batch_size':      '50',
