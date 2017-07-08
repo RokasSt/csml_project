@@ -109,7 +109,9 @@ if num_to_learn < N_train:
    
    if equal_per_classes:
    
-      train_images = utils.select_subset(class_files, n = num_to_learn//10)
+      train_images = utils.select_subset(class_files, 
+                                         n = num_to_learn//10,
+                                         D = D)
                                    
    else:
        
@@ -128,12 +130,6 @@ if num_to_learn < N_train:
 num_iters = N_train // batch_size
 
 ####### gobal parameters end
-
-if save_images:
-    
-   print("Saving training images")
-   np.savetxt(os.path.join(exp_path,"TRAIN_IMAGES.dat"), train_images)
-   
 if use_gpu:    
    print("Will attempt to use GPU")
    os.environ['THEANO_FLAGS'] = 'device=cuda'
@@ -197,7 +193,14 @@ os.makedirs(exp_path)
 with open(os.path.join(save_to_path,'HYPERPARAMS.json'), 'w') as json_file:
     
      json.dump(experiments, json_file)
-
+     
+if save_images:
+    
+   print("Saving training images")
+   np.savetxt(os.path.join(dir_name,"TRAIN_IMAGES.dat"), train_images)
+   
+# TODO: W0, b0, bhid0 init
+  
 for exp_tag in experiments.keys():
     
     param_dict = experiments[exp_tag]

@@ -1623,8 +1623,8 @@ class BoltzmannMachine(object):
         
                       if i % report_step ==0:
             
-                     print('Training epoch %d ---- Iter %d ----'+\
-                     ' pseudo cost value: %f'%(epoch_index, i, approx_cost))
+                         print('Training epoch %d ---- Iter %d ----'+\
+                         ' pseudo cost value: %f'%(epoch_index, i, approx_cost))
            
                    if report_p_tilda:
                    

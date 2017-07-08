@@ -10,6 +10,7 @@ import numpy as np
 import theano.tensor as T
 import theano
 import sys
+import os
 import matplotlib
 matplotlib.use('agg',warn=False, force=True)
 from matplotlib import pyplot as plt
@@ -206,9 +207,9 @@ def select_subset(list_of_paths, n, D):
     
     list_filenames - list of filenames """
     
-    num_classes = len(list_filenames)
+    num_classes = len(list_of_paths)
     
-    selected_images = np.zeros([num_classes*num_per_class, D])
+    selected_images = np.zeros([num_classes*n, D])
     
     for cli in range(num_classes):
         
