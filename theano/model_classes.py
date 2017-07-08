@@ -28,17 +28,12 @@ class BoltzmannMachine(object):
                  num_hidden,
                  training_inputs = None,
                  algorithm = None,
+                 algorithm_dict = None,
                  batch_size = None,
-                 num_samples = None,
-                 num_cd_steps = None,
-                 data_samples = None,
-                 unique_samples = None,
-                 is_uniform   = None,
-                 mf_steps = None,
                  use_momentum = None,
-                 W= None, 
-                 b= None, 
-                 bhid = None,
+                 W0= None, 
+                 b0= None, 
+                 bhid0 = None,
                  report_p_tilda =False,
                  test_mode= False,
                  training = True):
@@ -62,17 +57,47 @@ class BoltzmannMachine(object):
         
         self.batch_size     = batch_size
         
-        self.num_samples    = num_samples
+        self.algorithm      = algorithm
         
-        self.num_cd_steps   = num_cd_steps
+        self.num_samples    = None
         
-        self.data_samples   = data_samples
+        self.num_cd_steps   = None
         
-        self.unique_samples = unique_samples
+        self.data_samples   = None
         
-        self.mf_steps       = mf_steps
+        self.resample       = None
         
-        self.is_uniform     = is_uniform
+        self.mf_steps       = None
+        
+        self.is_uniform     = None
+        
+        for param in algorithm_dict.keys():
+            
+            if param == 'resample':
+                
+               self.resample = algorithm_dict[param]
+               
+            if param == 'mf_steps':
+                
+               self.mf_steps = algorithm_dict[param]
+               
+            if param == "num_cd_steps":
+                
+               self.num_cd_steps = algorithm_dict[param]
+               
+            if param == "is_uniform":
+                
+               self.is_uniform = algorithm_dict[param]
+               
+            if param == "num_samples":
+                
+               self.num_samples = algorithm_dict[param]
+               
+            if param == "data_samples":
+                
+               self.data_samples = algorithm_dict[param]
+               
+        ##########
         
         self.use_momentum   = use_momentum
         
@@ -87,8 +112,6 @@ class BoltzmannMachine(object):
          
         #self.theano_rand_gen =\
          #T.shared_randomstreams.RandomStreams(self.np_rand_gen.randint(2**30))
-        
-        self.algorithm = algorithm
         
         theano.config.exception_verbosity = 'high'
         
@@ -119,7 +142,7 @@ class BoltzmannMachine(object):
                                           
            self.learning_rate  = T.dscalar('learning_rate')
            
-           if use_momentum == True:
+           if use_momentum:
                
               print("Will add momentum term to gradient computations")
               
@@ -161,7 +184,7 @@ class BoltzmannMachine(object):
               
            else:
                                           
-              if W is None:
+              if W0 is None:
                   
                  if self.num_hidden > 0:
                     
@@ -206,28 +229,28 @@ class BoltzmannMachine(object):
                     assert (test_W == np.transpose(test_W)).all() == True
               
               else:
-            
-                 self.W = W
+                 print("W is initialized with provided array")
+                 self.W = theano.shared(value= W0, name='W', borrow=True)
            
-              if b is None:
+              if b0 is None:
         
                  bias_init = np.zeros(num_vars, dtype = theano.config.floatX)
         
                  self.b = theano.shared(value= bias_init, name='b', borrow=True)
            
               else:
-            
-                 self.b = b
+                 print("b vector is initialized with provided vector")
+                 self.b = theano.shared(value= b0, name='b', borrow=True)
                  
-              if bhid is None and self.num_hidden > 0:
+              if bhid0 is None and self.num_hidden > 0:
                  
                  hbias_init = np.zeros(self.num_hidden, dtype = theano.config.floatX)
         
                  self.bhid = theano.shared(value= hbias_init, name='bhid', borrow=True)
                  
-              elif (bhid != None) and (self.num_hidden > 0):
-                  
-                 self.bhid = bhid 
+              elif (bhid0 != None) and (self.num_hidden > 0):
+                 print("bhid vector is initialized with provided vector") 
+                 self.bhid = theano.shared(value= bhid0, name='bhid', borrow=True)
            
            self.theta    = [self.W, self.b]
            
@@ -367,7 +390,7 @@ class BoltzmannMachine(object):
         
         """ function to add mf approximation of energy terms in Z"""
         
-        if self.unique_samples:
+        if self.resample:
                
            print("Samples will be drawn for each instance in a minibatch")
            [list_mf_samples, weight_term], updates =\
@@ -436,26 +459,26 @@ class BoltzmannMachine(object):
         
         weight_term = T.log(self.var_num_samples) + self.num_vars*T.log(0.5)
         
-        if self.unique_samples and self.num_hidden ==0:
+        if self.resample and self.num_hidden ==0:
            
            approx_Z = -self.compute_energy(self.x_tilda, 
                                            self.var_num_samples*self.batch_size)
            
-        elif (not self.unique_samples) and self.num_hidden ==0:
+        elif (not self.resample) and self.num_hidden ==0:
            
            approx_Z = -self.compute_energy(self.x_tilda, self.var_num_samples)
            
-        elif self.unique_samples and self.num_hidden > 0:
+        elif self.resample and self.num_hidden > 0:
             
            approx_Z = -self.compute_free_energy(self.x_tilda)
            
-        elif (not self.unique_samples) and self.num_hidden >0:
+        elif (not self.resample) and self.num_hidden >0:
            
            approx_Z = -self.compute_free_energy(self.x_tilda)
               
         approx_Z = approx_Z - weight_term
         
-        if self.unique_samples:
+        if self.resample:
            
            approx_Z = T.reshape(approx_Z, [self.batch_size, self.var_num_samples])
         
@@ -604,7 +627,7 @@ class BoltzmannMachine(object):
            
         if non_data_samples:
            
-           if self.unique_samples:
+           if self.resample:
                
               if (self.data_samples == self.N_train) or (self.data_samples ==0):
             
@@ -1149,7 +1172,7 @@ class BoltzmannMachine(object):
         
         """ function to build a Theano computational graph """
         
-        cd_sampling = None
+        self.cd_sampling = None
         
         if self.algorithm == "CD" or self.algorithm == "PCD":
 
@@ -1157,7 +1180,7 @@ class BoltzmannMachine(object):
            
            if self.num_hidden ==0:
               
-              cd_sampling = self.get_cd_samples()
+              self.cd_sampling = self.get_cd_samples()
            
         if self.algorithm == "CSS" and self.mf_steps > 0: 
         
@@ -1173,9 +1196,7 @@ class BoltzmannMachine(object):
     
         self.add_pseudo_cost_measure()
 
-        optimize = self.optimization_step()
- 
-        return cd_sampling, optimize
+        self.optimize = self.optimization_step()
         
     def test_pseudo_likelihood(self, test_inputs, num_steps):
         
@@ -1369,6 +1390,283 @@ class BoltzmannMachine(object):
                                      
         test_grads(samples, training_points)
         
+    def reconstruct_images(self, 
+                           num_iters, 
+                           recon_images, 
+                           which_pixels,
+                           test_mode = False):
+    
+        """ function to reconstruct images with missing pixels """
+    
+        N = recon_images.shape[0]
+    
+        if self.num_hidden == 0:
+        
+           tE = -self.compute_energy(self.x, 1)
+           
+        elif self.num_hidden > 0:
+            
+           tE = -self.compute_free_energy(self.x)
+    
+        do_computation = theano.function(inputs  =[self.x], outputs = tE)
+        
+        for xi  in range(N):
+            
+            print("Reconstructing test image --- %d"%xi)
+            
+            if test_mode:
+               num_checked =0
+               check_counter = int(0.5*np.sum(which_pixels[xi,:] == True))
+        
+            for iter in range(num_iters):
+        
+                permuted_nodes = list(np.random.permutation(self.num_vars))
+        
+                for d in permuted_nodes:
+            
+                    if which_pixels[xi,d]:
+                    
+                       recon_images[xi, d] = 1
+                   
+                       E1 = do_computation([recon_images[xi, :]])
+                   
+                       recon_images[xi, d] = 0
+                   
+                       E0 = do_computation([recon_images[xi, :]])
+                   
+                       if E1>E0:
+                          recon_images[xi, d] = 1
+                       else:
+                          recon_images[xi, d] = 0
+                          
+                       if test_mode:
+                          num_checked +=1
+                       if test_mode and num_checked <= check_counter:
+                          break
+        return recon_images
+        
+    def train_model(self, 
+                    num_epochs, 
+                    learning_rate, 
+                    momentum, 
+                    num_iters,
+                    report_pseudo_cost,
+                    save_inter_params,
+                    report_step,
+                    report_p_tilda,
+                    exp_path,
+                    test_gradients = False):
+                    
+        """ function to carry out training of Botlzmann Machine"""
+    
+        if report_p_tilda and (report_step != None):
+        
+           p_t_i = 0
+       
+           p_tilda_all = np.zeros(
+           [num_epochs*num_iters//report_step,self.batch_size]
+           )
+       
+        else:
+        
+           p_tilda_all = []
+       
+        pseudo_losses = []
+       
+        if report_pseudo_cost and (report_step != None):
+       
+           lowest_pseudo_cost = np.inf
+       
+        start_train_time = timeit.default_timer()
+    
+        for epoch_index in range(num_epochs):
+        
+            epoch_time0 = timeit.default_timer()
+    
+            perm_inds = np.random.permutation(N_train)
+    
+            #put different learning_rate rules (per epoch) for now here:
+        
+            #lrate_epoch = learning_rate
+    
+            lrate_epoch = (1.0/(1+epoch_index/100.))*learning_rate/self.batch_size
+      
+            # lrate_epoch = (0.9**epoch_index)*learning_rate  # 0.99
+    
+            # lrate_epoch  = learning_rate
+    
+            if self.use_momentum:
+    
+               momentum_epoch = momentum
+    
+            print("Learning rate for epoch %d --- %f"%(epoch_index,lrate_epoch))
+        
+            if report_pseudo_cost and (report_step != None):
+        
+               avg_pseudo_cost_val = []
+    
+            for i in range(num_iters):
+        
+                iter_start_time = timeit.default_timer()
+    
+                minibatch_inds = perm_inds[batch_size*i:batch_size*(i+1)]
+            
+                if self.algorithm =="CSS":
+                    
+                   if (self.num_samples > 0) and (self.is_uniform != True):
+               
+                      if self.mf_steps > 0:
+                         print("Updating MF parameters ...")
+                         mf_t0 = timeit.default_timer()
+              
+                         self.do_mf_updates(num_steps = self.mf_steps)
+              
+                         mf_t1 = timeit.default_timer()
+                         print("%d steps of MF updates took --- %f minutes"%
+                         (self.mf_steps,(mf_t1 -mf_t0)/60.0))
+               
+                   if self.data_samples > 0:
+               
+                      sampled_indices = bm.select_data(minibatch_inds)
+              
+                      sampling_var = sampled_indices
+                                               
+                   if self.data_samples ==0 and self.is_uniform:
+               
+                      if self.resample > 0:
+                 
+                         is_samples = self.np_rand_gen.binomial(n=1,p=0.5, 
+                         size = (self.num_samples*self.batch_size, self.num_vars))
+                 
+                      else:
+                 
+                         is_samples = self.np_rand_gen.binomial(n=1,p=0.5, 
+                         size = (self.num_samples, self.num_vars))
+              
+                      sampling_var = np.asarray(is_samples, 
+                                                dtype = theano.config.floatX)
+              
+                   if test_gradients:
+                      t0 = timeit.default_timer()
+                      approx_cost, p_tilda = self.optimize(sampling_var, 
+                                                     list(minibatch_inds),
+                                                     lrate_epoch,
+                                                     self.num_samples)
+                      t1 = timeit.default_timer()  
+                      print("Gradient computation with implementation 1 took"+\
+                      " --- %f minutes"%((t1 - t0)/60.0))
+                      W_implicit = np.asarray(bm.W.get_value())
+                      b_implicit = np.asarray(bm.b.get_value())
+                      t0 = timeit.default_timer()
+                      self.test_grad_computations(is_samples, list(minibatch_inds))
+                      t1 = timeit.default_timer()
+                      print("Gradient computation with implementation 2 took "+\
+                      "--- %f minutes"%((t1 - t0)/60.0))
+                      W_explicit = np.asarray(bm.W.get_value())
+                      b_explicit = np.asarray(bm.b.get_value())
+                      print("Equivalence of W updates in two implementations:")
+                      print((np.round(W_implicit,12) == np.round(W_explicit,12)).all())
+                      print("Equivalence of b updates in two implementations:")
+                      print((np.round(b_implicit,12) == np.round(b_explicit,12)).all())
+                      sys.exit()
+           
+                   if self.use_momentum and self.is_uniform:
+              
+                      approx_cost, p_tilda = self.optimize(sampling_var, 
+                                                  list(minibatch_inds),
+                                                  lrate_epoch,
+                                                  momentum_epoch,
+                                                  self.num_samples)
+              
+                   elif (not self.use_momentum) and self.is_uniform:
+              
+                      approx_cost, p_tilda = self.optimize(sampling_var, 
+                                                  list(minibatch_inds),
+                                                  lrate_epoch,
+                                                  self.num_samples) 
+                                              
+                   elif self.use_momentum and (not self.is_uniform):
+               
+                      approx_cost, p_tilda = self.optimize(list(minibatch_inds),
+                                                           lrate_epoch,
+                                                           momentum_epoch,
+                                                           self.num_samples)
+                                              
+                   elif (not use_momentum) and (not is_uniform):
+              
+                      approx_cost, p_tilda = self.optimize(list(minibatch_inds),
+                                                           lrate_epoch,
+                                                           self.num_samples) 
+            
+                if algorithm =="CD" or algorithm == "PCD":
+           
+                   if num_hidden ==0:
+            
+                      mf_sample, cd_sample = self.cd_sampling(list(minibatch_inds))
+           
+                      self.x_gibbs.set_value(np.transpose(cd_sample)) 
+           
+                   approx_cost, p_tilda = self.optimize(list(minibatch_inds),
+                                                    lrate_epoch)
+        
+                avg_pseudo_cost_val.append(approx_cost)
+        
+                if save_inter_params and (abs(approx_cost) < lowest_pseudo_cost):
+        
+                   self.save_model_params(os.path.join(exp_path,"TRAINED_PARAMS.model")) 
+           
+                   lowest_cost = abs(approx_cost)
+               
+                if report_step != None:
+                
+                   if report_pseudo_cost:
+        
+                      if i % report_step ==0:
+            
+                     print('Training epoch %d ---- Iter %d ----'+\
+                     ' pseudo cost value: %f'%(epoch_index, i, approx_cost))
+           
+                   if report_p_tilda:
+                   
+                      if i % report_step == 0:
+               
+                         print("p_tilda values for training examples:")
+                         print(p_tilda[0:batch_size])
+                         print("sum of these values:")
+                         print(np.sum(p_tilda[0:batch_size]))
+              
+                         p_tilda_all[p_t_i,:] = p_tilda[0:batch_size]
+              
+                         p_t_i +=1
+           
+                iter_end_time = timeit.default_timer()
+        
+                print('Training iteration took %f minutes'%
+                ((iter_end_time - iter_start_time) / 60.))
+            
+            if report_pseudo_cost and (report_step != None):
+        
+               avg_pseudo_cost_val = np.mean(avg_pseudo_cost_val)
+    
+               pseudo_losses.append(avg_pseudo_cost_val)
+        
+            print('Training epoch %d ---- average pseudo cost value: %f'
+            %(epoch_index, avg_pseudo_cost_val))
+    
+            epoch_time1 = timeit.default_timer()
+    
+            print ('Training epoch took %f minutes'%((epoch_time1 - epoch_time0)/60.))
+    
+            self.save_model_params(os.path.join(exp_path,"TRAINED_PARAMS_END.model"))
+        
+        end_train_time = timeit.default_timer()
+    
+        training_time = (end_train_time - start_train_time)/60.0
+
+        print('Training process took %f minutes'%training_time)
+    
+        return p_tilda_all, pseudo_losses, training_time
+        
     def sample_from_mf_dist(self, 
                             num_chains, 
                             num_samples,
@@ -1559,8 +1857,6 @@ class BoltzmannMachine(object):
                
               take_step = 1
               
-           updates = OrderedDict()
-           
         get_samples = theano.function(inputs  = [],
                                       outputs = output_vars, 
                                       updates = updates)
@@ -1592,7 +1888,8 @@ class BoltzmannMachine(object):
                 
                p_out = np.transpose(p_out) 
             
-            # without resetting the chains are persistent
+            # without resetting the chains are persistent for
+            # fully visible Boltzmann Machines
             # (self.x_gibbs are modified continuously)
             # self.x_gibbs.set_value(init_chains)
             

@@ -137,6 +137,91 @@ def make_raster_plots(images,
         
     plt.clf() 
     
+def get_noise_matrix(gamma, D, N):
+    
+    """ function to select which pixels are missing for 
+    the reconstruction task """
+    
+    select_pixels = np.random.rand(N,D) > 0.5
+    
+    return select_pixels
+    
+def hamming_distance(array1, array2):
+    
+    """ function to compute the hamming distance between binary arrays"""
+    
+    return np.sum(np.abs(array1- array2))
+    
+def save_images_per_class(images, labels, root_dir):
+    
+    """ function to save images for each individual class separately
+    
+    images - N x D matrix of training images
+    
+    labels - N x K matrix of one-hot encodings of image labels"""
+    
+    num_images  = images.shape[0]
+    
+    D = images.shape[1]
+    
+    assert num_images == labels.shape[0]
+    
+    num_classes = labels.shape[1]
+    
+    cl_arr = {0:np.zeros([1,D]), 
+              1:np.zeros([1,D]), 
+              2:np.zeros([1,D]), 
+              3:np.zeros([1,D]), 
+              4:np.zeros([1,D]), 
+              5:np.zeros([1,D]), 
+              6:np.zeros([1,D]), 
+              7:np.zeros([1,D]), 
+              8:np.zeros([1,D]), 
+              9:np.zeros([1,D])}
+    
+    for ind in range(num_images):
+        
+        if cl_arr[int(np.argmax(labels[ind,:]))].shape[0] == 1:
+            
+           cl_arr[int(np.argmax(labels[ind,:]))] = images[ind,:]
+        
+        else:
+           
+           cl_arr[int(np.argmax(labels[ind,:]))] = \
+           np.vstack([cl_arr[int(np.argmax(labels[ind,:]))], images[ind,:]])
+        
+    for cli in cl_arr.keys():
+        
+        n = len(cl_arr[cli])
+        
+        class_images = np.reshape(cl_arr[cli],[n,D])
+        
+        save_to_path  = os.path.join(root_dir,"CLASS%d.dat"%cli)
+        
+        np.savetxt(save_to_path, class_images)
+        
+def select_subset(list_of_paths, n, D):
+
+    """ function to select a training subset
+    
+    list_filenames - list of filenames """
+    
+    num_classes = len(list_filenames)
+    
+    selected_images = np.zeros([num_classes*num_per_class, D])
+    
+    for cli in range(num_classes):
+        
+        cl_img = np.loadtxt(list_of_paths[cli])
+        
+        inds = np.random.choice(range(cl_img.shape[0]), n, replace=False)
+                                
+        assert len(inds) == n
+        
+        selected_images[cli*n:(cli+1)*n,:] = cl_img[inds,:]
+        
+    return selected_images
+    
 if __name__ == "__main__":
     
     ### this block is for testing functions
@@ -175,7 +260,8 @@ if __name__ == "__main__":
     
     print(compute_quad_matrix([[1,2],[3,4]], [[1,1,2],[1,1,2]], [[1],[1]]))
     
-    diag_quad_terms, updates = theano.scan(lambda i: energy_function(W,b,x_matrix[:,i]), sequences = [T.arange(3) ] )
+    diag_quad_terms, updates = \
+    theano.scan(lambda i: energy_function(W,b,x_matrix[:,i]), sequences = [T.arange(3)])
     
     compute_diag_terms =  theano.function([W,x_matrix,b], diag_quad_terms)
     

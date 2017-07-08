@@ -117,6 +117,12 @@ if bool(trained_subset):
       
       test_inputs = np.reshape(test_inputs,[1,len(test_inputs)])
       
+   elif indices.size ==1 and (num_chains ==1):
+       
+      use_num_chains = 1
+      
+      test_inputs = np.reshape(test_inputs,[1,len(test_inputs)])
+      
    elif indices.size != 1 and (num_chains ==1):
        
       select_inds = np.random.choice(len(indices), 
@@ -201,24 +207,28 @@ print("")
    
 is_samples = np_rand_gen.binomial(n=1, p=0.5, size = (num_is_samples, D))
    
-train_p_tilda, rand_p_tilda = bm.test_p_tilda(x_to_test_p, 
+test_p_tilda, rand_p_tilda = bm.test_p_tilda(x_to_test_p, 
                                               is_samples,
                                               training = False)
    
-print("p_tilda values for training inputs:")
-print(train_p_tilda)
+if bool(trained_subset):
+   print("p_tilda values for 10 training inputs:")
+else:
+   print("p_tilda values for 10 test inputs:")
+print(test_p_tilda)
 print("")
 print("p_tilda values for 10 randomly chosen importance samples:")
 print(rand_p_tilda)
 print("")
+
+np.savetxt(os.path.join(split_path[0], "TEST_P_TILDA.dat"), test_p_tilda)
+np.savetxt(os.path.join(split_path[0], "RAND_P_TILDA.dat"), rand_p_tilda)
    
 print("-------------- Computing pseudo likelihood ------------------")
    
 pseudo_cost = bm.test_pseudo_likelihood(x_to_test_p, num_steps= 784)
 print("Stochastic approximation to pseudo likelihood ---- %f"%pseudo_cost)
    
-start_time = timeit.default_timer()
-
 ## init_with_dataset overrides trained_subset option
 if not init_with_dataset:
     
@@ -226,6 +236,8 @@ if not init_with_dataset:
 #################### 
  
 if sampler == "MF":
+    
+   start_time = timeit.default_timer()
 
    bm.sample_from_mf_dist(num_chains   = use_num_chains, 
                           num_samples  = num_samples,
@@ -233,9 +245,15 @@ if sampler == "MF":
                           save_to_path = save_to_path,
                           test_inputs  = test_inputs,
                           save_mf_params = True)
-    
+                          
+   
+   end_time = timeit.default_timer()
+                   
+   print('Image generation took %f minutes'%((end_time - start_time)/60.)) 
     
 elif sampler == "GIBBS":
+    
+   start_time = timeit.default_timer()
 
    bm.sample_from_bm(num_chains   = use_num_chains, 
                      num_samples  = num_samples,
@@ -243,11 +261,11 @@ elif sampler == "GIBBS":
                      save_to_path = save_to_path,
                      num_burn_in  = num_burn_in,
                      test_inputs  = test_inputs)
-        
+         
                     
-end_time = timeit.default_timer()
+   end_time = timeit.default_timer()
                    
-print('Image generation took %f minutes'%((end_time - start_time)/60.))
+   print('Image generation took %f minutes'%((end_time - start_time)/60.))
 
 
                    
