@@ -71,31 +71,33 @@ class BoltzmannMachine(object):
         
         self.is_uniform     = None
         
-        for param in algorithm_dict.keys():
+        if isinstance(algorithm_dict, dict):
+        
+           for param in algorithm_dict.keys():
             
-            if param == 'resample':
+               if param == 'resample':
                 
-               self.resample = algorithm_dict[param]
+                  self.resample = algorithm_dict[param]
                
-            if param == 'mf_steps':
+               if param == 'mf_steps':
                 
-               self.mf_steps = algorithm_dict[param]
+                  self.mf_steps = algorithm_dict[param]
                
-            if param == "num_cd_steps":
+               if param == "num_cd_steps":
                 
-               self.num_cd_steps = algorithm_dict[param]
+                  self.num_cd_steps = algorithm_dict[param]
                
-            if param == "is_uniform":
+               if param == "is_uniform":
                 
-               self.is_uniform = algorithm_dict[param]
+                  self.is_uniform = algorithm_dict[param]
                
-            if param == "num_samples":
+               if param == "num_samples":
                 
-               self.num_samples = algorithm_dict[param]
+                  self.num_samples = algorithm_dict[param]
                
-            if param == "data_samples":
+               if param == "data_samples":
                 
-               self.data_samples = algorithm_dict[param]
+                  self.data_samples = algorithm_dict[param]
                
         ##########
         
@@ -402,7 +404,7 @@ class BoltzmannMachine(object):
         
            weight_term    = theano.gradient.disconnected_grad(weight_term)
         
-           weight_term    = T.log(self.var_num_samples*weight_term)
+           weight_term    = T.log(self.var_num_samples) + weight_term
            
            if self.num_hidden ==0:
         
@@ -436,7 +438,7 @@ class BoltzmannMachine(object):
         
            weight_term = theano.gradient.disconnected_grad(weight_term)
         
-           weight_term = T.log(self.var_num_samples*weight_term)
+           weight_term = T.log(self.var_num_samples) + weight_term
            
            if self.num_hidden == 0:
               
@@ -451,13 +453,19 @@ class BoltzmannMachine(object):
            
         return approx_Z_mf
         
-    def add_is_uni_approximation(self):
+    def add_is_approximation(self):
         
         """ function to add computations of energies and their weights
         in the approximating term in normalizer Z. Samples are obtained
         using uniform importances sampling."""
         
-        weight_term = T.log(self.var_num_samples) + self.num_vars*T.log(0.5)
+        if self.is_probs == None:
+        
+           weight_term = T.log(self.var_num_samples) + self.num_vars*T.log(0.5)
+           
+        else:
+        
+           TODO log_q_vals =  self.get_importance_evals(samples, mf_vals)
         
         if self.resample and self.num_hidden ==0:
            
@@ -499,7 +507,7 @@ class BoltzmannMachine(object):
                
               print("Will use uniform importance sampling for Z approximation")
               
-              approx_Z = self.add_is_uni_approximation()
+              approx_Z = self.add_is_approximation()
               
            else:
            
@@ -663,14 +671,13 @@ class BoltzmannMachine(object):
            
         return approx_Z
         
-    def get_mf_evaluations(self, samples, mf_params):
+    def get_importance_evals(self, samples, params):
         
-        """ function to get evaluations of mean field distribution"""
+        """ function to get evaluations of log importance distribution"""
         
-        evals = (mf_params**samples)*\
-        ((1.0 -  mf_params)**(1- samples))
+        evals = T.log(params)*samples + T.log(1.0 - params)*(1- samples)
         
-        evals = T.prod(evals, axis=0) # axis= 0: node index, axis=1: nth datum
+        evals = T.sum(evals, axis=0) # axis= 0: node index, axis=1: nth datum
         
         return evals
         
@@ -692,9 +699,9 @@ class BoltzmannMachine(object):
                                                 p   = mf_vals,
                                                 dtype=theano.config.floatX)
         
-        q_vals =  self.get_mf_evaluations(samples, mf_vals)
+        log_q_vals =  self.get_importance_evals(samples, mf_vals)
         
-        return T.transpose(samples), q_vals
+        return T.transpose(samples), log_q_vals
         
     def add_mf_updates(self):
         
@@ -927,10 +934,16 @@ class BoltzmannMachine(object):
                
             if self.use_momentum:
                 
-               g_tilda = self.momentum*self.grad_vec[target_param.name] - \
-               self.learning_rate*grad
+               #g_tilda = self.momentum*self.grad_vec[target_param.name] - \
+               #self.learning_rate*grad
                 
-               self.updates[target_param] = target_param + g_tilda
+               #self.updates[target_param] = target_param + g_tilda
+               
+               g_tilda = self.momentum*self.grad_vec[target_param.name] - \
+               (1-self.momentum)*grad
+                
+               self.updates[target_param] = target_param +\
+                self.learning_rate*g_tilda
                
                # store g_tilda for next iteration:
                
@@ -1291,7 +1304,7 @@ class BoltzmannMachine(object):
            
         if self.is_uniform and training:
         
-           sample_energies = self.add_is_uni_approximation()
+           sample_energies = self.add_is_approximation()
            
         elif (not self.is_uniform) and training:
             
@@ -1299,7 +1312,7 @@ class BoltzmannMachine(object):
            
         elif (not training):
             
-           sample_energies = self.add_is_uni_approximation()
+           sample_energies = self.add_is_approximation()
         
         all_energies = T.concatenate([minibatch_energies, sample_energies])
         
@@ -1390,11 +1403,78 @@ class BoltzmannMachine(object):
                                      
         test_grads(samples, training_points)
         
-    def reconstruct_images(self, 
-                           num_iters, 
-                           recon_images, 
-                           which_pixels,
-                           test_mode = False):
+    def log_noise_model(self, x, y, pflip):
+        
+        """ function to compute the log likelihood of the noise
+        model for the task of reconstructing noisy images """
+        
+        return np.log(pflip)*np.sum(x != y) + np.log(1.0-pflip)*np.sum(x == y)
+        
+    def reconstruct_noisy_pixels(self,
+                                 num_iters,
+                                 correct_images,
+                                 recon_images,
+                                 noisy_images,
+                                 pflip):
+                                
+        """ function to reconstruct images from noisy images """
+        
+        N = recon_images.shape[0]
+    
+        if self.num_hidden == 0:
+        
+           tE = -self.compute_energy(self.x, 1)
+           
+        elif self.num_hidden > 0:
+            
+           tE = -self.compute_free_energy(self.x)
+    
+        do_computation = theano.function(inputs  =[self.x], outputs = tE)
+        
+        for xi  in range(N):
+            
+            print("Reconstructing test image --- %d"%xi)
+            
+            E_model = do_computation([noisy_images[xi,:]])
+            
+            E_noise = self.log_noise_model(noisy_images[xi,:],
+                                           noisy_images[xi,:],
+                                           pflip)
+            
+            Emax = E_model + E_noise
+            
+            for iter_ind in range(num_iters):
+                print("Iteration ----- %d"%iter_ind)
+                
+                permuted_nodes = list(np.random.permutation(self.num_vars))
+        
+                for d in permuted_nodes:
+                    
+                    image_delta    = np.copy(recon_images[xi,:])
+                    
+                    image_delta[d] = 1 - image_delta[d]
+                    
+                    E_model = do_computation([image_delta])
+                    
+                    E_noise = self.log_noise_model(noisy_images[xi,:],
+                                                   image_delta,
+                                                   pflip)
+                    
+                    E_delta = E_model + E_noise
+                    
+                    if E_delta > Emax:
+                       
+                       recon_images[xi, d] = image_delta[d]
+                        
+                       Emax = E_delta
+                       
+        return recon_images
+        
+    def reconstruct_missing_pixels(self, 
+                                   num_iters, 
+                                   recon_images, 
+                                   which_pixels,
+                                   test_mode = False):
     
         """ function to reconstruct images with missing pixels """
     
@@ -1418,7 +1498,7 @@ class BoltzmannMachine(object):
                num_checked =0
                check_counter = int(0.5*np.sum(which_pixels[xi,:] == True))
         
-            for iter in range(num_iters):
+            for iter_ind in range(num_iters):
         
                 permuted_nodes = list(np.random.permutation(self.num_vars))
         
@@ -1451,15 +1531,16 @@ class BoltzmannMachine(object):
                     momentum, 
                     num_iters,
                     report_pseudo_cost,
-                    save_inter_params,
+                    save_every_epoch,
                     report_step,
                     report_p_tilda,
+                    report_w_norm,
                     exp_path,
                     test_gradients = False):
                     
         """ function to carry out training of Botlzmann Machine"""
     
-        if report_p_tilda and (report_step != None):
+        if report_p_tilda:
         
            p_t_i = 0
        
@@ -1472,10 +1553,16 @@ class BoltzmannMachine(object):
            p_tilda_all = []
        
         pseudo_losses = []
-       
-        if report_pseudo_cost and (report_step != None):
-       
-           lowest_pseudo_cost = np.inf
+        
+        if report_w_norm:
+            
+           w_norms = np.zeros(num_epochs*num_iters//report_step)
+           
+           w_i = 0
+           
+        else:
+            
+           w_norms = []
        
         start_train_time = timeit.default_timer()
     
@@ -1483,7 +1570,7 @@ class BoltzmannMachine(object):
         
             epoch_time0 = timeit.default_timer()
     
-            perm_inds = np.random.permutation(N_train)
+            perm_inds = self.np_rand_gen.permutation(self.N_train)
     
             #put different learning_rate rules (per epoch) for now here:
         
@@ -1501,7 +1588,7 @@ class BoltzmannMachine(object):
     
             print("Learning rate for epoch %d --- %f"%(epoch_index,lrate_epoch))
         
-            if report_pseudo_cost and (report_step != None):
+            if report_pseudo_cost:
         
                avg_pseudo_cost_val = []
     
@@ -1509,7 +1596,7 @@ class BoltzmannMachine(object):
         
                 iter_start_time = timeit.default_timer()
     
-                minibatch_inds = perm_inds[batch_size*i:batch_size*(i+1)]
+                minibatch_inds = perm_inds[self.batch_size*i:self.batch_size*(i+1)]
             
                 if self.algorithm =="CSS":
                     
@@ -1555,15 +1642,15 @@ class BoltzmannMachine(object):
                       t1 = timeit.default_timer()  
                       print("Gradient computation with implementation 1 took"+\
                       " --- %f minutes"%((t1 - t0)/60.0))
-                      W_implicit = np.asarray(bm.W.get_value())
-                      b_implicit = np.asarray(bm.b.get_value())
+                      W_implicit = np.asarray(self.W.get_value())
+                      b_implicit = np.asarray(self.b.get_value())
                       t0 = timeit.default_timer()
                       self.test_grad_computations(is_samples, list(minibatch_inds))
                       t1 = timeit.default_timer()
                       print("Gradient computation with implementation 2 took "+\
                       "--- %f minutes"%((t1 - t0)/60.0))
-                      W_explicit = np.asarray(bm.W.get_value())
-                      b_explicit = np.asarray(bm.b.get_value())
+                      W_explicit = np.asarray(self.W.get_value())
+                      b_explicit = np.asarray(self.b.get_value())
                       print("Equivalence of W updates in two implementations:")
                       print((np.round(W_implicit,12) == np.round(W_explicit,12)).all())
                       print("Equivalence of b updates in two implementations:")
@@ -1592,59 +1679,70 @@ class BoltzmannMachine(object):
                                                            momentum_epoch,
                                                            self.num_samples)
                                               
-                   elif (not use_momentum) and (not is_uniform):
+                   elif (not self.use_momentum) and (not self.is_uniform):
               
                       approx_cost, p_tilda = self.optimize(list(minibatch_inds),
                                                            lrate_epoch,
                                                            self.num_samples) 
             
-                if algorithm =="CD" or algorithm == "PCD":
+                if self.algorithm =="CD" or self.algorithm == "PCD":
            
-                   if num_hidden ==0:
+                   if self.num_hidden ==0:
             
-                      mf_sample, cd_sample = self.cd_sampling(list(minibatch_inds))
+                      if self.algorithm == "CD":
+                          
+                         mf_sample, cd_sample = self.cd_sampling(list(minibatch_inds))
            
-                      self.x_gibbs.set_value(np.transpose(cd_sample)) 
-           
-                   approx_cost, p_tilda = self.optimize(list(minibatch_inds),
-                                                    lrate_epoch)
+                         self.x_gibbs.set_value(np.transpose(cd_sample))
+                         
+                   if self.use_momentum:
+                         
+                      approx_cost, p_tilda = self.optimize(list(minibatch_inds),
+                                                           lrate_epoch,
+                                                           momentum_epoch)
+                                                           
+                   else:
+                       
+                      approx_cost, p_tilda = self.optimize(list(minibatch_inds),
+                                                           lrate_epoch,
+                                                           momentum_epoch)
         
                 avg_pseudo_cost_val.append(approx_cost)
-        
-                if save_inter_params and (abs(approx_cost) < lowest_pseudo_cost):
-        
-                   self.save_model_params(os.path.join(exp_path,"TRAINED_PARAMS.model")) 
-           
-                   lowest_cost = abs(approx_cost)
-               
-                if report_step != None:
                 
-                   if report_pseudo_cost:
+                if report_pseudo_cost:
         
-                      if i % report_step ==0:
+                   if i % report_step ==0:
             
-                         print('Training epoch %d ---- Iter %d ----'+\
-                         ' pseudo cost value: %f'%(epoch_index, i, approx_cost))
+                      print('Training epoch %d ---- Iter %d ----'%(epoch_index, i)+\
+                      ' pseudo cost value: %f'%approx_cost)
            
-                   if report_p_tilda:
+                if report_p_tilda:
                    
-                      if i % report_step == 0:
+                   if i % report_step == 0:
                
-                         print("p_tilda values for training examples:")
-                         print(p_tilda[0:batch_size])
-                         print("sum of these values:")
-                         print(np.sum(p_tilda[0:batch_size]))
+                      print("p_tilda values for training examples:")
+                      print(p_tilda[0:self.batch_size])
+                      print("sum of these values:")
+                      print(np.sum(p_tilda[0:self.batch_size]))
               
-                         p_tilda_all[p_t_i,:] = p_tilda[0:batch_size]
+                      p_tilda_all[p_t_i,:] = p_tilda[0:self.batch_size]
               
-                         p_t_i +=1
-           
+                      p_t_i +=1
+                         
+                if report_w_norm: 
+                       
+                   curr_w = self.W.get_value()  
+                       
+                   w_norms[w_i] = np.sum(np.multiply(curr_w, curr_w))
+                   
+                   w_i +=1
+                         
                 iter_end_time = timeit.default_timer()
         
                 print('Training iteration took %f minutes'%
                 ((iter_end_time - iter_start_time) / 60.))
             
-            if report_pseudo_cost and (report_step != None):
+            if report_pseudo_cost:
         
                avg_pseudo_cost_val = np.mean(avg_pseudo_cost_val)
     
@@ -1656,16 +1754,20 @@ class BoltzmannMachine(object):
             epoch_time1 = timeit.default_timer()
     
             print ('Training epoch took %f minutes'%((epoch_time1 - epoch_time0)/60.))
+            
+            if save_every_epoch:
     
-            self.save_model_params(os.path.join(exp_path,"TRAINED_PARAMS_END.model"))
+               self.save_model_params(os.path.join(exp_path,"TRAINED_PARAMS_END.model"))
         
         end_train_time = timeit.default_timer()
     
         training_time = (end_train_time - start_train_time)/60.0
 
         print('Training process took %f minutes'%training_time)
+        
+        self.save_model_params(os.path.join(exp_path,"TRAINED_PARAMS_END.model"))
     
-        return p_tilda_all, pseudo_losses, training_time
+        return p_tilda_all, pseudo_losses, training_time, w_norms
         
     def sample_from_mf_dist(self, 
                             num_chains, 

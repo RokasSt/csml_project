@@ -59,7 +59,7 @@ arg_parser.add_argument('--num_reconstruct', type=str,required= True)
 
 arg_parser.add_argument('--trained_subset', type = str, required = True)
 
-arg_parser.add_argument('--test_mode', type = str, required = True)
+arg_parser.add_argument('--test_mode', type = str, required = False)
 
 FLAGS, _          = arg_parser.parse_known_args()
 
@@ -71,7 +71,13 @@ num_reconstruct   = int(FLAGS.num_reconstruct)
 
 trained_subset    = int(FLAGS.trained_subset)
 
-test_mode         = bool(int(FLAGS.test_mode))
+if FLAGS.test_mode != None:
+
+   test_mode      = bool(int(FLAGS.test_mode))
+   
+else:
+    
+   test_mode = False
    
 if "RH" in path_to_params:
 
@@ -118,22 +124,6 @@ if num_test > num_reconstruct:
 elif num_test < num_reconstruct:
     
    num_reconstruct = num_test
-   
-filename = "RECONST"
-
-if "END" in path_to_params:
-   
-   filename+="_END"
-   
-elif "_INTER" in path_to_params:
-    
-   filename+="_INTER"
-   
-elif "INIT" in split_path[1]:
-    
-   filename+="_init"
-   
-save_to_path = os.path.join(split_path[0],filename+".jpeg")
 
 bm = BoltzmannMachine(num_vars        = D, 
                       num_hidden      = num_hidden,
@@ -141,67 +131,67 @@ bm = BoltzmannMachine(num_vars        = D,
       
 bm.load_model_params(full_path = path_to_params)
 
-which_pixels = utils.get_noise_matrix(gamma = 0.5, D= D, N= num_reconstruct)
+###### reconstruction of missing pixels
+filename = "RECONST_MISSING"
+
+save_to_path = os.path.join(split_path[0],filename+".jpeg")
+
+which_pixels = utils.select_missing_pixels(gamma = 0.5, 
+                                           D= D, 
+                                           N= num_reconstruct)
 
 images_to_reconst = np.copy(test_inputs)
 blocked_images    = np.copy(test_inputs)
 images_to_reconst[which_pixels] =  1
 blocked_images[which_pixels]    = -1
 
-images_to_reconst = bm.reconstruct_images(num_iters = num_iters, 
-                                          recon_images = images_to_reconst, 
-                                          which_pixels = which_pixels,
-                                          test_mode = test_mode)
-                                                                             
-num_rows = num_reconstruct
+images_to_reconst = \
+bm.reconstruct_missing_pixels(num_iters = num_iters, 
+                              recon_images = images_to_reconst, 
+                              which_pixels = which_pixels,
+                              test_mode = test_mode)
+                                                                            
+recon_errors= utils.plot_reconstructions(test_inputs,
+                                         blocked_images,
+                                         images_to_reconst,
+                                         save_to_path)
+                                         
+np.savetxt(os.path.join(split_path[0],"%s_ERRORS.dat"%filename), 
+           recon_errors)
 
-num_cols = 3
-                                          
-_, ax = plt.subplots(num_rows, num_cols, sharex=False ,
-figsize=  (3 * num_cols, 3 * num_rows) )
-    
-ax = ax.ravel()
-    
-plot_index = 0
-    
-for xi in range(num_reconstruct):
-    
-    ax[plot_index].imshow(np.reshape(test_inputs[xi,:], [28,28]))
-               
-    ax[plot_index].set_xticks([])
-    ax[plot_index].set_yticks([])
-    ax[plot_index].set_yticklabels([])
-    ax[plot_index].set_xticklabels([])
-            
-    plot_index += 1
-    
-    ax[plot_index].imshow(np.reshape(blocked_images[xi,:], [28,28]))
-               
-    ax[plot_index].set_xticks([])
-    ax[plot_index].set_yticks([])
-    ax[plot_index].set_yticklabels([])
-    ax[plot_index].set_xticklabels([])
-            
-    plot_index += 1
-    
-    ax[plot_index].imshow(np.reshape(images_to_reconst[xi,:], [28,28]))
-               
-    ax[plot_index].set_xticks([])
-    ax[plot_index].set_yticks([])
-    ax[plot_index].set_yticklabels([])
-    ax[plot_index].set_xticklabels([])
-            
-    plot_index += 1
-    
-    dist_val = utils.hamming_distance(test_inputs[xi,:],
-                                      images_to_reconst[xi,:])
-                                      
-    print("Hamming distance between the true image and "+\
-    "its reconstruction: %f"%dist_val)
-    
-plt.tight_layout()
-plt.savefig(save_to_path)
-        
-plt.clf() 
-   
+############### reconstruction of noisy data
+
+pflip = 0.1
+
+filename = "RECONST_NOISY"
+
+save_to_path = os.path.join(split_path[0],filename+".jpeg")
+
+which_pixels = utils.select_noisy_pixels(pflip = pflip, 
+                                         D     = D, 
+                                         N     = num_reconstruct)
+                                         
+noisy_images = np.copy(test_inputs)
+
+noisy_images[which_pixels] = 1- noisy_images[which_pixels]
+
+images_to_reconst= np.copy(noisy_images)
+
+images_to_reconst = bm.reconstruct_noisy_pixels(num_iters    = num_iters, 
+                                                correct_images = test_inputs,
+                                                recon_images = images_to_reconst, 
+                                                noisy_images = noisy_images,
+                                                pflip        = pflip)
+                                                
+recon_errors= utils.plot_reconstructions(test_inputs,
+                                         noisy_images,
+                                         images_to_reconst,
+                                         save_to_path)
+                                         
+np.savetxt(os.path.join(split_path[0],"%s_ERRORS.dat"%filename), 
+           recon_errors)
+
+
+
+
 

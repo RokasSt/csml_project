@@ -40,9 +40,11 @@ test_comp_energies   = False
 
 save_init_weights    = True
 
-gen_samples          = False
+save_every_epoch     = False
 
-num_samples_coeff    = 1.0
+report_pseudo_cost   = True
+
+report_w_norm        = True
 
 test_images      = np.round(mnist.test.images)
 
@@ -178,11 +180,15 @@ if test_grad_mode:
    
    use_momentum = False
    
+algorithm_dict = {}
+   
 if algorithm == "CD" or algorithm == "PCD":
     
    assert FLAGS.num_steps != None 
     
    num_cd_steps = int(FLAGS.num_steps)
+   
+   algorithm_dict['num_cd_steps'] = num_cd_steps
    
    specs = (num_hidden,
             str(learning_rate),
@@ -193,15 +199,15 @@ if algorithm == "CD" or algorithm == "PCD":
 
    exp_tag = "RH%dLR%sM%sBS%dNST%d_%s"%specs
    
-   num_samples  = None 
+   algorithm_dict['num_samples']  = None 
    
-   data_samples = None
+   algorithm_dict['data_samples'] = None
    
-   resample     = None
+   algorithm_dict['resample']     = None
    
-   is_uniform   = False
+   algorithm_dict['is_uniform']   = False
    
-   mf_steps     = None
+   algorithm_dict['mf_steps']     = None
    
 report_p_tilda = False
    
@@ -211,63 +217,62 @@ if algorithm   == "CSS":
    
    assert FLAGS.data_samples != None
     
-   num_cd_steps   = None
+   algorithm_dict['num_cd_steps'] = None
    
-   num_samples    = int(FLAGS.num_samples)
+   algorithm_dict['num_samples']    = int(FLAGS.num_samples)
    
-   data_samples   = int(FLAGS.data_samples)
+   algorithm_dict['data_samples']   = int(FLAGS.data_samples)
    
-   if num_samples ==0:
+   if algorithm_dict['num_samples'] == 0:
    
       specs = (num_hidden,
                str(learning_rate),
                str(momentum),
                batch_size,
-               num_samples,
-               data_sampples,
+               algorithm_dict['num_samples'] ,
+               algorithm_dict['data_samples'],
                datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" ))
    
       exp_tag = "RH%dLR%sM%sBS%dNS%dDATA%d_%s"%specs
       
-      resample = None
+      algorithm_dict['resample'] = None
       
-      mf_steps = 0
+      algorithm_dict['mf_steps'] = 0
       
-   is_uniform = False
+   algorithm_dict['is_uniform'] = False
       
-   if num_samples > 0:
+   if algorithm_dict['num_samples'] > 0:
        
       if FLAGS.is_uniform != None:
           
-         is_uniform = bool(int(FLAGS.is_uniform))
-       
-      if FLAGS.mf_steps != None:
-          
-         mf_steps = int(FLAGS.mf_steps)
+         algorithm_dict['is_uniform']  = bool(int(FLAGS.is_uniform))
          
-      else:
-          
-         mf_steps = 0
+         algorithm_dict['mf_steps'] = 0
        
+      elif FLAGS.mf_steps != None:
+          
+         algorithm_dict['mf_steps'] = int(FLAGS.mf_steps)
+      
       assert FLAGS.resample != None
        
-      resample = int(FLAGS.resample)
+      algorithm_dict['resample'] = int(FLAGS.resample)
        
       specs = (num_hidden,
                str(learning_rate),
                str(momentum),
                batch_size,
-               num_samples,
-               resample,
-               data_samples,
-               mf_steps,
+               algorithm_dict['num_samples'],
+               algorithm_dict['resample'],
+               algorithm_dict['data_samples'],
+               algorithm_dict['mf_steps'],
                datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" ))
    
       exp_tag = "RH%dLR%sM%sBS%dNS%dRS%dDATA%dMF%d_%s"%specs
       
-      resample = bool(resample)
+      algorithm_dict['resample'] = bool(algorithm_dict['resample'])
       
-   if (num_learn < 50) and (data_samples ==0) and (resample != 1):
+   if (num_learn < 50) and (algorithm_dict['data_samples'] ==0) \
+   and (algorithm_dict['resample'] != True):
    
       print("Will report p_tilda for this experiment")
       report_p_tilda = True
@@ -288,13 +293,8 @@ bm = BoltzmannMachine(num_vars        = input_dim,
                       num_hidden      = num_hidden,
                       training_inputs = train_images,
                       algorithm       = algorithm,
+                      algorithm_dict  = algorithm_dict,
                       batch_size      = batch_size,
-                      num_samples     = num_samples,
-                      num_cd_steps    = num_cd_steps,
-                      data_samples    = data_samples,
-                      unique_samples  = resample,
-                      is_uniform      = is_uniform,
-                      mf_steps        = mf_steps,
                       use_momentum    = use_momentum,
                       report_p_tilda  = report_p_tilda,
                       test_mode       = test_grad_mode)
@@ -348,12 +348,12 @@ elif test_comp_energies:
 elif test_grad_mode:
     
    print("Testing mode")
-   cd_sampling, optimize = bm.add_graph()
    
 else:
     
    print("Training mode")
-   cd_sampling, optimize = bm.add_graph()
+   
+   bm.add_graph()
    
    exp_path = os.path.join(dir_name,exp_tag)
         
@@ -372,220 +372,33 @@ else:
       bm.save_model_params(os.path.join(exp_path,"INIT_PARAMS.model"))
       print("saved initial weights of fully visible Boltzmann Machine")
       
-start_time = timeit.default_timer()
+   p_tilda_all, losses, train_time, w_norms = \
+    bm.train_model(num_epochs         = num_epochs, 
+                   learning_rate      = learning_rate, 
+                   momentum           = momentum, 
+                   num_iters          = num_iters,
+                   report_pseudo_cost = report_pseudo_cost,
+                   save_every_epoch   = save_every_epoch,
+                   report_step        = report_step,
+                   report_p_tilda     = report_p_tilda,
+                   report_w_norm      = report_w_norm,
+                   exp_path           = exp_path,
+                   test_gradients     = test_grad_mode)
+                   
+   if report_pseudo_cost:
+    
+      np.savetxt(os.path.join(exp_path, "TRAIN_PSEUDO_LOSSES.dat"), losses)
+   
+   if report_w_norm:
+      print("Saving W norms")
+      np.savetxt(os.path.join(exp_path, "W_NORMS.dat"), w_norms)
 
-epoch_time0 = start_time
+   np.savetxt(os.path.join(exp_path,"TRAINING_TIME.dat"), 
+              np.array([train_time]))
 
-lowest_cost = np.inf
-
-for epoch_index in range(num_epochs):
+   if report_p_tilda:
     
-    permuted_inds = np.random.permutation(N_train)
-    
-    if algorithm == "CSS":
-    
-       # put different learning_rate rules (per epoch) for now here:
-    
-       lrate_epoch = (1.0/(1+epoch_index/100.))*learning_rate/batch_size
-      
-       # lrate_epoch = (0.9**epoch_index)*learning_rate  # 0.99
-    
-       # lrate_epoch  = learning_rate
-       
-    else:
-        
-       lrate_epoch = learning_rate
-    
-    if use_momentum:
-    
-       momentum_epoch = momentum
-    
-    print("Learning rate for epoch %d --- %f"%(epoch_index,lrate_epoch))
-    
-    avg_cost_val = []
-    
-    for i in range(num_iters):
-        
-        iter_start_time = timeit.default_timer()
-    
-        minibatch_inds = permuted_inds[batch_size*i:batch_size*(i+1)]
-        
-        if algorithm =="CSS":
-           ### thoughts on manipulating number of samples during training 
-           if num_samples_coeff != 1.0:
-            
-              if (epoch_index > 0) and (i%1000 == 0):
-              
-                 if num_samples > 10:
-              
-                    num_samples = int(num_samples_coeff*num_samples)
-              
-                    print("Decreasing number of samples to %d"%bm.num_samples)
-           ###########   
-           if (num_samples > 0) and (is_uniform != True):
-               
-              if mf_steps > 0:
-                 print("Updating MF parameters ...")
-                 mf_t0 = timeit.default_timer()
-              
-                 bm.do_mf_updates(num_steps = mf_steps)
-              
-                 mf_t1 = timeit.default_timer()
-                 print("%d steps of MF updates took --- %f minutes"%
-                 (mf_steps,(mf_t1 -mf_t0)/60.0))
-                 
-           opt_t0 = timeit.default_timer()
-           ###
-           if data_samples > 0:
-               
-              sampled_indices = bm.select_data(minibatch_inds)
-              
-              sampling_var = sampled_indices
-                                               
-           if data_samples ==0 and is_uniform:
-               
-              if resample > 0:
-                 
-                 is_samples = bm.np_rand_gen.binomial(n=1,p=0.5, 
-                 size = (bm.num_samples*batch_size, bm.num_vars))
-                 
-              else:
-                 
-                 is_samples = bm.np_rand_gen.binomial(n=1,p=0.5, 
-                 size = (bm.num_samples, bm.num_vars))
-              
-              sampling_var = np.asarray(is_samples, 
-                                        dtype = theano.config.floatX)
-              
-              if test_grad_mode:
-                 t0 = timeit.default_timer()
-                 approx_cost, p_tilda = optimize(sampling_var, 
-                                                 list(minibatch_inds),
-                                                 lrate_epoch,
-                                                 num_samples)
-                 t1 = timeit.default_timer()  
-                 print("Gradient computation with implementation 1 took"+\
-                 " --- %f minutes"%((t1 - t0)/60.0))
-                 W_implicit = np.asarray(bm.W.get_value())
-                 b_implicit = np.asarray(bm.b.get_value())
-                 t0 = timeit.default_timer()
-                 bm.test_grad_computations(is_samples, list(minibatch_inds))
-                 t1 = timeit.default_timer()
-                 print("Gradient computation with implementation 2 took "+\
-                 "--- %f minutes"%((t1 - t0)/60.0))
-                 W_explicit = np.asarray(bm.W.get_value())
-                 b_explicit = np.asarray(bm.b.get_value())
-                 print("Equivalence of W updates in two implementations:")
-                 print((np.round(W_implicit,12) == np.round(W_explicit,12)).all())
-                 print("Equivalence of b updates in two implementations:")
-                 print((np.round(b_implicit,12) == np.round(b_explicit,12)).all())
-                 sys.exit()
-           
-           if use_momentum and is_uniform:
-              
-              approx_cost, p_tilda = optimize(sampling_var, 
-                                              list(minibatch_inds),
-                                              lrate_epoch,
-                                              momentum_epoch,
-                                              num_samples)
-              
-           elif (not use_momentum) and is_uniform:
-              
-              approx_cost, p_tilda = optimize(sampling_var, 
-                                              list(minibatch_inds),
-                                              lrate_epoch,
-                                              num_samples) 
-                                              
-           elif use_momentum and (not is_uniform):
-               
-              approx_cost, p_tilda = optimize(list(minibatch_inds),
-                                              lrate_epoch,
-                                              momentum_epoch,
-                                              num_samples)
-                                              
-           elif (not use_momentum) and (not is_uniform):
-              
-              approx_cost, p_tilda = optimize(list(minibatch_inds),
-                                              lrate_epoch,
-                                              num_samples) 
-              
-           ###
-           opt_t1 = timeit.default_timer()
-           print("Optimization step took --- %f minutes"%
-           ((opt_t1 - opt_t0)/60.0))
-            
-        if algorithm =="CD" or algorithm == "PCD":
-           
-           if num_hidden ==0:
-            
-              mf_sample, cd_sample = cd_sampling(list(minibatch_inds))
-           
-              bm.x_gibbs.set_value(np.transpose(cd_sample)) 
-           
-           approx_cost, p_tilda = optimize(list(minibatch_inds),
-                                           lrate_epoch)
-        
-        avg_cost_val.append(approx_cost)
-        
-        if save_best_params and (abs(approx_cost) < lowest_cost):
-        
-           bm.save_model_params(os.path.join(exp_path,"TRAINED_PARAMS.model")) 
-           
-           lowest_cost = abs(approx_cost) 
-        
-        if i % report_step ==0:
-            
-           print('Training epoch %d ---- Iter %d ---- pseudo cost value: %f'
-           %(epoch_index, i, approx_cost))
-           
-           if report_p_tilda:
-               
-              print("p_tilda values for training examples:")
-              print(p_tilda[0:batch_size])
-              print("sum of these values:")
-              print(np.sum(p_tilda[0:batch_size]))
-              
-              p_tilda_all[p_t_i,:] = p_tilda[0:batch_size]
-              
-              p_t_i +=1
-           
-        iter_end_time = timeit.default_timer()
-        
-        print('Training iteration took %f minutes'%
-        ((iter_end_time - iter_start_time) / 60.))
-        
-    avg_cost_val = np.mean(avg_cost_val)
-    
-    losses.append(avg_cost_val)
-        
-    print('Training epoch %d ---- average pseudo cost value: %f'
-    %(epoch_index, avg_cost_val))
-    
-    epoch_time = timeit.default_timer()
-    
-    print ('Training epoch took %f minutes'%((epoch_time - epoch_time0)/60.))
-    
-    if not save_best_params:
-    
-       bm.save_model_params(os.path.join(exp_path,"TRAINED_PARAMS.model"))
-    
-    epoch_time0 = epoch_time
-    
-training_time = (epoch_time0 - start_time)/60.0
-
-print('Training took %f minutes'%training_time)
-
-if save_end_params:
-    
-   bm.save_model_params(os.path.join(exp_path,"TRAINED_PARAMS_END.model"))
-    
-np.savetxt(os.path.join(exp_path,"TRAIN_LOSSES.dat"), losses)
-
-np.savetxt(os.path.join(exp_path,"TRAINING_TIME.dat"), np.array([training_time]))
-
-if report_p_tilda:
-    
-   np.savetxt(os.path.join(exp_path,"TRAIN_P_TILDA.dat"), p_tilda_all)
+      np.savetxt(os.path.join(exp_path,"TRAIN_P_TILDA.dat"), p_tilda_all)
 
 
     

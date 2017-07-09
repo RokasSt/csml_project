@@ -138,7 +138,7 @@ def make_raster_plots(images,
         
     plt.clf() 
     
-def get_noise_matrix(gamma, D, N):
+def select_missing_pixels(gamma, D, N):
     
     """ function to select which pixels are missing for 
     the reconstruction task """
@@ -147,6 +147,14 @@ def get_noise_matrix(gamma, D, N):
     
     return select_pixels
     
+def select_noisy_pixels(pflip, D, N):
+    
+    """ function to select which pixels are corrupted with noise"""
+    
+    select_pixels = np.random.rand(N,D) < pflip
+    
+    return select_pixels
+     
 def hamming_distance(array1, array2):
     
     """ function to compute the hamming distance between binary arrays"""
@@ -222,6 +230,145 @@ def select_subset(list_of_paths, n, D):
         selected_images[cli*n:(cli+1)*n,:] = cl_img[inds,:]
         
     return selected_images
+    
+def plot_reconstructions(correct_images,
+                         corrupted_images,
+                         reconstructed_images,
+                         save_to_path):
+                             
+    """ function to plot test images, their corrupted versions and 
+    their reconstructions """
+    
+    num_reconstruct = correct_images.shape[0]
+    
+    reconstruction_errors = np.zeros([1,num_reconstruct])
+    
+    num_rows = num_reconstruct
+
+    num_cols = 3
+                                          
+    _, ax = plt.subplots(num_rows, num_cols, sharex=False ,
+    figsize=  (3 * num_cols, 3 * num_rows) )
+    
+    ax = ax.ravel()
+    
+    plot_index = 0
+    
+    for xi in range(num_reconstruct):
+    
+        ax[plot_index].imshow(np.reshape(correct_images[xi,:], [28,28]))
+               
+        ax[plot_index].set_xticks([])
+        ax[plot_index].set_yticks([])
+        ax[plot_index].set_yticklabels([])
+        ax[plot_index].set_xticklabels([])
+            
+        plot_index += 1
+    
+        ax[plot_index].imshow(np.reshape(corrupted_images[xi,:], [28,28]))
+               
+        ax[plot_index].set_xticks([])
+        ax[plot_index].set_yticks([])
+        ax[plot_index].set_yticklabels([])
+        ax[plot_index].set_xticklabels([])
+            
+        plot_index += 1
+    
+        ax[plot_index].imshow(np.reshape(reconstructed_images[xi,:], [28,28]))
+               
+        ax[plot_index].set_xticks([])
+        ax[plot_index].set_yticks([])
+        ax[plot_index].set_yticklabels([])
+        ax[plot_index].set_xticklabels([])
+            
+        plot_index += 1
+    
+        dist_val = hamming_distance(correct_images[xi,:], 
+                                    reconstructed_images[xi,:])
+                                      
+        print("Image --- %d ----"%xi+\
+        " hamming distance between the true image and "+\
+        "its reconstruction: %f"%dist_val)
+        
+        reconstruction_errors[0,xi] = dist_val
+    
+    plt.tight_layout()
+    plt.savefig(save_to_path)
+        
+    plt.clf()
+    
+    return reconstruction_errors
+
+def compare_reconstructions(correct_images,
+                            corrupted_images,
+                            reconstructed_images,
+                            save_to_path):
+                             
+    """ function to plot test images, their corrupted versions and 
+    their reconstructions under different training algorithms"""
+    
+    num_reconstruct = correct_images.shape[0]
+    
+    num_rows = num_reconstruct
+
+    num_cols = len(reconstructed_images.keys()) + 2
+    
+    _, ax = plt.subplots(num_rows, num_cols, sharex=False ,
+    figsize=  (3 * num_cols, 3 * num_rows) )
+    
+    ax = ax.ravel()
+    
+    plot_index = 0
+    
+    for xi in range(num_reconstruct):
+        
+        if xi ==0:
+               
+           ax[plot_index].set_title("Correct", size = 13) 
+    
+        ax[plot_index].imshow(np.reshape(correct_images[xi,:], [28,28]))
+               
+        ax[plot_index].set_xticks([])
+        ax[plot_index].set_yticks([])
+        ax[plot_index].set_yticklabels([])
+        ax[plot_index].set_xticklabels([])
+            
+        plot_index += 1
+        
+        if xi ==0:
+               
+           ax[plot_index].set_title("Corrupted", size = 13) 
+    
+        ax[plot_index].imshow(np.reshape(corrupted_images[xi,:], [28,28]))
+               
+        ax[plot_index].set_xticks([])
+        ax[plot_index].set_yticks([])
+        ax[plot_index].set_yticklabels([])
+        ax[plot_index].set_xticklabels([])
+            
+        plot_index += 1
+        
+        for algorithm in reconstructed_images.keys():
+            
+            if xi ==0:
+               
+               ax[plot_index].set_title("%s"%algorithm, size = 13) 
+               
+            img = reconstructed_images[algorithm][xi,:] 
+    
+            ax[plot_index].imshow(np.reshape(img, [28,28]))
+               
+            ax[plot_index].set_xticks([])
+            ax[plot_index].set_yticks([])
+            ax[plot_index].set_yticklabels([])
+            ax[plot_index].set_xticklabels([])
+            
+            plot_index += 1
+    
+    plt.tight_layout()
+    plt.savefig(save_to_path)
+        
+    plt.clf()
     
 if __name__ == "__main__":
     

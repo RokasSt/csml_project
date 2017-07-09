@@ -8,18 +8,18 @@ class Experiments(object):
     
   """ Add parameters of the experiments here """
     
-  exp1 ={'num_epochs'   :   '3000',
+  exp1 ={'num_epochs'   :   '1300',
          'batch_size'   :   '10',
-         'learning_rate':   '0.1',
+         'learning_rate':   '0.05',
          'experiment'   :   'exp1_CSS',
          'data_samples' :   '0', # 0 means that only minibatch points
                 #will contribute to the data term of Z approximation.
-         'num_samples'  :   '1000',
+         'num_samples'  :   '100',
          'resample'     :   '0',  # '0' - do not resample for each minibatch point.
          'momentum'     :   '0',
          'is_uniform'   :   '1',
          'algorithm'    :   'CSS',
-         'num_hidden'   :   '500',
+         'num_hidden'   :   '0',
          'use_gpu'      :   '0', #'1'
          'learn_subset' :   '10'}
           
@@ -55,13 +55,14 @@ class Experiments(object):
          'algorithm'    :   'CSS',
          'use_gpu'    :     '1'}
   
-  exp5 ={'num_epochs':      '15',
-         'batch_size':      '50',
+  exp5 ={'num_epochs':      '1500',
+         'batch_size':      '10',
          'learning_rate':   '0.05',
          'experiment':      'exp1_CD1',
          'num_steps':       '1',
          'algorithm'  :     'CD',
-         'use_gpu'    :     '1'}
+         'use_gpu'    :     '0',
+         'learn_subset' :   '10'}
          
   exp6 ={'num_epochs':      '15',
          'batch_size':      '50',
