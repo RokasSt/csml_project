@@ -80,7 +80,7 @@ arg_parser.add_argument('--data_samples', type = str, required = False)
 
 arg_parser.add_argument('--learn_subset', type = str, required = False)
 
-arg_parser.add_argument('--is_uniform', type = str, required = False)
+arg_parser.add_argument('--use_is', type = str, required = False)
 
 arg_parser.add_argument('--resample', type = str, required = False)
 
@@ -205,7 +205,7 @@ if algorithm == "CD" or algorithm == "PCD":
    
    algorithm_dict['resample']     = None
    
-   algorithm_dict['is_uniform']   = False
+   algorithm_dict['use_is']       = False
    
    algorithm_dict['mf_steps']     = None
    
@@ -239,13 +239,13 @@ if algorithm   == "CSS":
       
       algorithm_dict['mf_steps'] = 0
       
-   algorithm_dict['is_uniform'] = False
+   algorithm_dict['use_is'] = False
       
    if algorithm_dict['num_samples'] > 0:
        
-      if FLAGS.is_uniform != None:
+      if FLAGS.use_is != None:
           
-         algorithm_dict['is_uniform']  = bool(int(FLAGS.is_uniform))
+         algorithm_dict['use_is']  = bool(int(FLAGS.use_is))
          
          algorithm_dict['mf_steps'] = 0
        
@@ -289,6 +289,17 @@ import theano
 import theano.tensor as T
 from   model_classes import BoltzmannMachine
 
+if algorithm   == "CSS":
+ 
+   alpha=0.995
+   
+   is_probs = (1-alpha)*0.5*np.ones([1, input_dim])+\
+   alpha*np.mean(train_images,0)
+    
+   is_probs = np.asarray(is_probs, dtype = theano.config.floatX)
+   
+   algorithm_dict['is_probs']  = is_probs
+   
 bm = BoltzmannMachine(num_vars        = input_dim, 
                       num_hidden      = num_hidden,
                       training_inputs = train_images,

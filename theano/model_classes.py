@@ -69,7 +69,9 @@ class BoltzmannMachine(object):
         
         self.mf_steps       = None
         
-        self.is_uniform     = None
+        self.use_is         = None
+        
+        self.is_probs       = []
         
         if isinstance(algorithm_dict, dict):
         
@@ -87,9 +89,9 @@ class BoltzmannMachine(object):
                 
                   self.num_cd_steps = algorithm_dict[param]
                
-               if param == "is_uniform":
+               if param == "use_is":
                 
-                  self.is_uniform = algorithm_dict[param]
+                  self.use_is = algorithm_dict[param]
                
                if param == "num_samples":
                 
@@ -98,7 +100,23 @@ class BoltzmannMachine(object):
                if param == "data_samples":
                 
                   self.data_samples = algorithm_dict[param]
+                  
+               if param == "is_probs":
+                   
+                  self.is_probs  = algorithm_dict[param]
+                                                 
+        if self.is_probs != []:
+           
+           if self.resample:
                
+              num_times = self.batch_size*self.num_samples
+           
+              self.is_probs = np.tile(self.is_probs, (num_times, 1))
+              
+           else:
+              
+              self.is_probs = np.tile(self.is_probs, (self.num_samples, 1))
+              
         ##########
         
         self.use_momentum   = use_momentum
@@ -266,8 +284,6 @@ class BoltzmannMachine(object):
         
            self.sample_set      = T.ivector('sample_set')
            
-           self.var_num_samples = T.iscalar('var_num_samples')
-           
            if self.algorithm == "CD" and self.num_hidden ==0:
            
               self.x_gibbs= theano.shared(np.zeros([self.batch_size,self.num_vars],
@@ -281,7 +297,7 @@ class BoltzmannMachine(object):
                                        dtype=theano.config.floatX),
                                       borrow = True, name= "persistent_gibbs")
               
-           if self.algorithm == "CSS" and self.is_uniform  != True:
+           if self.algorithm == "CSS" and self.use_is  != True:
               
               init_mf_vis = self.np_rand_gen.uniform(0, 1, size =(self.num_vars,1))
               
@@ -404,13 +420,13 @@ class BoltzmannMachine(object):
         
            weight_term    = theano.gradient.disconnected_grad(weight_term)
         
-           weight_term    = T.log(self.var_num_samples) + weight_term
+           weight_term    = T.log(self.num_samples) + weight_term
            
            if self.num_hidden ==0:
         
               approx_Z_mf, updates = \
               theano.scan(lambda i : -self.compute_energy(list_mf_samples[i],\
-              self.var_num_samples),sequences = [T.arange(self.batch_size)])
+              self.num_samples),sequences = [T.arange(self.batch_size)])
         
            if self.num_hidden > 0:
                
@@ -421,10 +437,10 @@ class BoltzmannMachine(object):
            self.updates.update(updates)
         
            weight_term   = T.reshape(weight_term,
-                                    [self.batch_size, self.var_num_samples])
+                                    [self.batch_size, self.num_samples])
         
            approx_Z_mf = T.reshape(approx_Z_mf,
-                                   [self.batch_size, self.var_num_samples])
+                                   [self.batch_size, self.num_samples])
                                      
            approx_Z_mf = approx_Z_mf - weight_term
            
@@ -438,12 +454,12 @@ class BoltzmannMachine(object):
         
            weight_term = theano.gradient.disconnected_grad(weight_term)
         
-           weight_term = T.log(self.var_num_samples) + weight_term
+           weight_term = T.log(self.num_samples) + weight_term
            
            if self.num_hidden == 0:
               
               approx_Z_mf = -self.compute_energy(mf_samples, 
-                                                 self.var_num_samples)
+                                                 self.num_samples)
                                                  
            if self.num_hidden > 0:
               
@@ -459,22 +475,29 @@ class BoltzmannMachine(object):
         in the approximating term in normalizer Z. Samples are obtained
         using uniform importances sampling."""
         
-        if self.is_probs == None:
+        if self.is_probs == []:
         
-           weight_term = T.log(self.var_num_samples) + self.num_vars*T.log(0.5)
+           weight_term = T.log(self.num_samples) + self.num_vars*T.log(0.5)
            
         else:
-        
-           TODO log_q_vals =  self.get_importance_evals(samples, mf_vals)
+           
+           weight_term = T.log(self.num_samples)+\
+             self.get_importance_evals(T.transpose(self.x_tilda), 
+                                       np.transpose(self.is_probs))
+                                       
+           if self.resample:
+               
+              weight_term =  T.reshape(weight_term, 
+                                       [self.batch_size, self.num_samples])
         
         if self.resample and self.num_hidden ==0:
            
            approx_Z = -self.compute_energy(self.x_tilda, 
-                                           self.var_num_samples*self.batch_size)
+                                           self.num_samples*self.batch_size)
            
         elif (not self.resample) and self.num_hidden ==0:
            
-           approx_Z = -self.compute_energy(self.x_tilda, self.var_num_samples)
+           approx_Z = -self.compute_energy(self.x_tilda, self.num_samples)
            
         elif self.resample and self.num_hidden > 0:
             
@@ -483,12 +506,12 @@ class BoltzmannMachine(object):
         elif (not self.resample) and self.num_hidden >0:
            
            approx_Z = -self.compute_free_energy(self.x_tilda)
-              
-        approx_Z = approx_Z - weight_term
         
         if self.resample:
            
-           approx_Z = T.reshape(approx_Z, [self.batch_size, self.var_num_samples])
+           approx_Z = T.reshape(approx_Z, [self.batch_size, self.num_samples])
+           
+        approx_Z = approx_Z - weight_term
         
         return approx_Z
         
@@ -503,7 +526,7 @@ class BoltzmannMachine(object):
             
            non_data_samples = True
            
-           if self.is_uniform:
+           if self.use_is:
                
               print("Will use uniform importance sampling for Z approximation")
               
@@ -531,14 +554,14 @@ class BoltzmannMachine(object):
 
            max_vals = T.reshape(max_vals,[self.batch_size,1])
            
-           if self.is_uniform:
+           if self.use_is:
               
               max_vals_tiled = T.tile(max_vals,
-                                      (1,self.var_num_samples+self.batch_size))
+                                      (1,self.num_samples+self.batch_size))
                
            else:
            
-              max_vals_tiled= T.tile(max_vals,(1,self.var_num_samples+1))
+              max_vals_tiled= T.tile(max_vals,(1,self.num_samples+1))
            
            approx_Z = approx_Z - max_vals_tiled
         
@@ -687,14 +710,14 @@ class BoltzmannMachine(object):
         
         if not data:
            
-           mf_vals =  T.tile(self.mf_vis_params,(1,self.var_num_samples))
+           mf_vals =  T.tile(self.mf_vis_params,(1,self.num_samples))
            
         else:
             
            mf_vals = self.mf_vis_params
         
         samples = self.theano_rand_gen.binomial(size= (self.num_vars,
-                                                       self.var_num_samples),
+                                                       self.num_samples),
                                                 n   = 1, 
                                                 p   = mf_vals,
                                                 dtype=theano.config.floatX)
@@ -1060,7 +1083,7 @@ class BoltzmannMachine(object):
            
               var_list = [self.sample_set, self.minibatch_set]
               
-           elif (self.data_samples == 0) and self.is_uniform:
+           elif (self.data_samples == 0) and self.use_is:
                
               input_dict = {
                self.x      : self.train_inputs[self.minibatch_set,:]
@@ -1068,7 +1091,7 @@ class BoltzmannMachine(object):
            
               var_list = [self.x_tilda, self.minibatch_set]
               
-           elif (self.data_samples ==0) and (not self.is_uniform):
+           elif (self.data_samples ==0) and (not self.use_is):
               
               input_dict = {
                self.x      : self.train_inputs[self.minibatch_set,:]
@@ -1099,11 +1122,7 @@ class BoltzmannMachine(object):
         else:
             
            output_vars.append(theano.shared(0))
-           
-        if self.algorithm == "CSS":
         
-           var_list.append(self.var_num_samples)
-           
         opt_step = theano.function(inputs  = var_list,
                                    outputs = output_vars,
                                    updates = self.updates,
@@ -1241,8 +1260,6 @@ class BoltzmannMachine(object):
         
         self.num_samples     = random_inputs.shape[0]
         
-        self.var_num_samples = self.num_samples
-        
         self.add_p_tilda(training = training)
         
         var_list = [self.x, self.x_tilda]
@@ -1302,11 +1319,11 @@ class BoltzmannMachine(object):
             
            minibatch_energies = -self.compute_free_energy(self.x)
            
-        if self.is_uniform and training:
+        if self.use_is and training:
         
            sample_energies = self.add_is_approximation()
            
-        elif (not self.is_uniform) and training:
+        elif (not self.use_is) and training:
             
            sample_energies = self.add_mf_approximation()
            
@@ -1373,7 +1390,7 @@ class BoltzmannMachine(object):
         gradb-self.batch_size*self.p_tilda[self.batch_size+i]*\
         self.x_tilda[i,:]],
         outputs_info =[gradW, gradb],
-        sequences =[T.arange(self.var_num_samples)])
+        sequences =[T.arange(self.num_samples)])
         
         gradW = gradW[-1] /self.batch_size
         
@@ -1600,7 +1617,7 @@ class BoltzmannMachine(object):
             
                 if self.algorithm =="CSS":
                     
-                   if (self.num_samples > 0) and (self.is_uniform != True):
+                   if (self.num_samples > 0) and (self.use_is != True):
                
                       if self.mf_steps > 0:
                          print("Updating MF parameters ...")
@@ -1618,18 +1635,28 @@ class BoltzmannMachine(object):
               
                       sampling_var = sampled_indices
                                                
-                   if self.data_samples ==0 and self.is_uniform:
+                   if self.data_samples ==0 and self.use_is:
                
-                      if self.resample > 0:
+                      if self.resample and self.is_probs ==[]:
                  
                          is_samples = self.np_rand_gen.binomial(n=1,p=0.5, 
                          size = (self.num_samples*self.batch_size, self.num_vars))
                  
-                      else:
+                      elif (not self.resample) and self.is_probs == []:
                  
-                         is_samples = self.np_rand_gen.binomial(n=1,p=0.5, 
+                         is_samples = self.np_rand_gen.binomial(n=1, p=0.5, 
                          size = (self.num_samples, self.num_vars))
-              
+                         
+                      elif self.resample and self.is_probs != []:
+                         
+                         is_samples = self.np_rand_gen.binomial(n=1, p= self.is_probs, 
+                         size = (self.num_samples*self.batch_size, self.num_vars)) 
+                         
+                      elif (not self.resample) and self.is_probs != []:
+                          
+                         is_samples = self.np_rand_gen.binomial(n=1, p= self.is_probs, 
+                         size = (self.num_samples, self.num_vars)) 
+                         
                       sampling_var = np.asarray(is_samples, 
                                                 dtype = theano.config.floatX)
               
@@ -1637,8 +1664,8 @@ class BoltzmannMachine(object):
                       t0 = timeit.default_timer()
                       approx_cost, p_tilda = self.optimize(sampling_var, 
                                                      list(minibatch_inds),
-                                                     lrate_epoch,
-                                                     self.num_samples)
+                                                     lrate_epoch)
+                                                     
                       t1 = timeit.default_timer()  
                       print("Gradient computation with implementation 1 took"+\
                       " --- %f minutes"%((t1 - t0)/60.0))
@@ -1657,33 +1684,29 @@ class BoltzmannMachine(object):
                       print((np.round(b_implicit,12) == np.round(b_explicit,12)).all())
                       sys.exit()
            
-                   if self.use_momentum and self.is_uniform:
+                   if self.use_momentum and self.use_is:
               
                       approx_cost, p_tilda = self.optimize(sampling_var, 
                                                   list(minibatch_inds),
                                                   lrate_epoch,
-                                                  momentum_epoch,
-                                                  self.num_samples)
+                                                  momentum_epoch)
               
-                   elif (not self.use_momentum) and self.is_uniform:
+                   elif (not self.use_momentum) and self.use_is:
               
                       approx_cost, p_tilda = self.optimize(sampling_var, 
                                                   list(minibatch_inds),
-                                                  lrate_epoch,
-                                                  self.num_samples) 
+                                                  lrate_epoch) 
                                               
-                   elif self.use_momentum and (not self.is_uniform):
+                   elif self.use_momentum and (not self.use_is):
                
                       approx_cost, p_tilda = self.optimize(list(minibatch_inds),
                                                            lrate_epoch,
-                                                           momentum_epoch,
-                                                           self.num_samples)
+                                                           momentum_epoch)
                                               
-                   elif (not self.use_momentum) and (not self.is_uniform):
+                   elif (not self.use_momentum) and (not self.use_is):
               
                       approx_cost, p_tilda = self.optimize(list(minibatch_inds),
-                                                           lrate_epoch,
-                                                           self.num_samples) 
+                                                           lrate_epoch) 
             
                 if self.algorithm =="CD" or self.algorithm == "PCD":
            
@@ -1781,8 +1804,6 @@ class BoltzmannMachine(object):
         fully visible Boltzmann Machine."""
         
         self.num_samples = num_chains
-        
-        self.var_num_samples = self.num_samples
         
         if type(test_inputs) is  np.ndarray:
             

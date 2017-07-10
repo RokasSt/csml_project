@@ -140,6 +140,17 @@ if hyperparams['num_to_learn'] < hyperparams['N_train']:
 
 hyperparams['num_iters'] = hyperparams['N_train'] // hyperparams['batch_size']
 
+alpha=0.995
+
+if alpha != None:
+   
+   is_probs = (1-alpha)*0.5*np.ones([1,hyperparams['D']])+\
+    alpha*np.mean(train_images,0)
+    
+else:
+    
+   is_probs  = []
+
 ####### gobal parameters end
 if hyperparams['use_gpu']:    
    print("Will attempt to use GPU")
@@ -148,6 +159,10 @@ if hyperparams['use_gpu']:
 import theano
 import theano.tensor as T
 from   model_classes import BoltzmannMachine
+
+if is_probs != []:
+
+   is_probs = np.asarray(is_probs, dtype = theano.config.floatX)
 
 exp1 ={'num_epochs'    : 200,
        'batch_size'    : hyperparams['batch_size'],
@@ -158,7 +173,8 @@ exp1 ={'num_epochs'    : 200,
             'data_samples'  : False,
             'num_samples'   : 100,
             'resample'      : False,  
-            'is_uniform'    : True,
+            'use_is'        : True,
+            'is_probs'      : is_probs,
             'mf_steps'      : 0,
            
            },
