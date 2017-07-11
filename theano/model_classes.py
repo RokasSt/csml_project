@@ -105,14 +105,16 @@ class BoltzmannMachine(object):
                   self.data_samples = algorithm_dict[param]
                   
                if param == "alpha":
-                  
-                  alpha = algorithm_dict[param]
-                  
-                  self.is_probs= (1-alpha)*0.5*np.ones([1,self.num_vars])+\
+                   
+                  alpha = algorithm_dict[param]  
+                
+                  if alpha != None:
+                     
+                     self.is_probs= (1-alpha)*0.5*np.ones([1,self.num_vars])+\
                                   alpha*np.mean(training_inputs,0)
                                   
-                  self.is_probs = \
-                  np.asarray(self.is_probs, dtype = theano.config.floatX)
+                     self.is_probs = \
+                     np.asarray(self.is_probs, dtype = theano.config.floatX)
                                                  
         if self.is_probs != []:
            

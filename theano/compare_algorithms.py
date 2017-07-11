@@ -134,7 +134,7 @@ if params['num_to_learn'] < params['N_train']:
 
 params['num_iters'] = params['N_train'] // params['batch_size']
 
-alpha= 0.995 # 0.5
+alpha= 0.3 #0.5 # 0.0 # 0.995
 
 ####### gobal parameters end
 if params['use_gpu']:    
@@ -205,11 +205,22 @@ dir_name ="logs_%s_%s_%s"%(exp1_string, exp2_string, exp3_string)
 
 curr_time = datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" )
 
-spec_tag = "NR%dNEP%dLR%sM%s_%s"%(params['num_runs'],
-                                  params['num_epochs'],
-                                  str(params['learning_rate']),
-                                  str(params['momentum']),
-                                  curr_time)
+if alpha != None:
+
+   spec_tag = "NR%dNEP%dLR%sM%sALPHA%s_%s"%(params['num_runs'],
+                                            params['num_epochs'],
+                                            str(params['learning_rate']),
+                                            str(params['momentum']),
+                                            str(alpha),
+                                            curr_time)
+                                          
+else:
+    
+   spec_tag = "NR%dNEP%dLR%sM%s_%s"%(params['num_runs'],
+                                     params['num_epochs'],
+                                     str(params['learning_rate']),
+                                     str(params['momentum']),
+                                     curr_time) 
   
 root_path = os.path.join(dir_name, spec_tag)
 

@@ -374,7 +374,7 @@ def compare_reconstructions(correct_images,
         
     plt.clf()
     
-def plot_w_norms(w_norms_dict, save_to_path):
+def plot_w_norms(w_norms_dict, save_to_path, w_norms_std = None):
     
     """plot temporal sequences of w norms"""
     
@@ -383,7 +383,7 @@ def plot_w_norms(w_norms_dict, save_to_path):
     num_cols = 1
     
     _, ax = plt.subplots(num_rows, num_cols, sharex=False )
-    #figsize=  (3 * num_cols, 3 * num_rows) )
+    #figsize=  ( 1*num_cols, 1*num_rows) )
     
     ax = ax.ravel()
     
@@ -397,7 +397,15 @@ def plot_w_norms(w_norms_dict, save_to_path):
         
         ax[plot_index].set_title(exp_tag, size = 13) 
         
-        ax[plot_index].plot(iters, w_norms_dict[exp_tag])
+        if isinstance(w_norms_std, dict):
+        
+           ax[plot_index].errorbar(iters,
+                                   w_norms_dict[exp_tag],
+                                   yerr= w_norms_std[exp_tag])
+                                   
+        else:
+            
+           ax[plot_index].plot(iters, w_norms_dict[exp_tag]) 
         
         ax[plot_index].set_xlabel('Iteration number')
     
