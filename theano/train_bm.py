@@ -223,6 +223,8 @@ if algorithm   == "CSS":
    
    algorithm_dict['data_samples']   = int(FLAGS.data_samples)
    
+   algorithm_dict['alpha']  = 0.995
+   
    if algorithm_dict['num_samples'] == 0:
    
       specs = (num_hidden,
@@ -289,17 +291,6 @@ import theano
 import theano.tensor as T
 from   model_classes import BoltzmannMachine
 
-if algorithm   == "CSS":
- 
-   alpha=0.995
-   
-   is_probs = (1-alpha)*0.5*np.ones([1, input_dim])+\
-   alpha*np.mean(train_images,0)
-    
-   is_probs = np.asarray(is_probs, dtype = theano.config.floatX)
-   
-   algorithm_dict['is_probs']  = is_probs
-   
 bm = BoltzmannMachine(num_vars        = input_dim, 
                       num_hidden      = num_hidden,
                       training_inputs = train_images,

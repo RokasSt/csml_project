@@ -138,7 +138,7 @@ def make_raster_plots(images,
         
     plt.clf() 
     
-def select_missing_pixels(gamma, D, N):
+def get_missing_pixels(gamma, D, N):
     
     """ function to select which pixels are missing for 
     the reconstruction task """
@@ -147,7 +147,7 @@ def select_missing_pixels(gamma, D, N):
     
     return select_pixels
     
-def select_noisy_pixels(pflip, D, N):
+def get_noisy_pixels(pflip, D, N):
     
     """ function to select which pixels are corrupted with noise"""
     
@@ -309,9 +309,9 @@ def compare_reconstructions(correct_images,
     
     num_reconstruct = correct_images.shape[0]
     
-    num_rows = num_reconstruct
-
-    num_cols = len(reconstructed_images.keys()) + 2
+    num_rows = len(reconstructed_images.keys()) + 2
+    
+    num_cols = num_reconstruct
     
     _, ax = plt.subplots(num_rows, num_cols, sharex=False ,
     figsize=  (3 * num_cols, 3 * num_rows) )
@@ -335,6 +335,8 @@ def compare_reconstructions(correct_images,
             
         plot_index += 1
         
+    for xi in range(num_reconstruct):
+        
         if xi ==0:
                
            ax[plot_index].set_title("Corrupted", size = 13) 
@@ -348,7 +350,9 @@ def compare_reconstructions(correct_images,
             
         plot_index += 1
         
-        for algorithm in reconstructed_images.keys():
+    for algorithm in reconstructed_images.keys():
+        
+        for xi in range(num_reconstruct):
             
             if xi ==0:
                
@@ -368,6 +372,45 @@ def compare_reconstructions(correct_images,
     plt.tight_layout()
     plt.savefig(save_to_path)
         
+    plt.clf()
+    
+def plot_w_norms(w_norms_dict, save_to_path):
+    
+    """plot temporal sequences of w norms"""
+    
+    num_rows = len(w_norms_dict.keys())
+    
+    num_cols = 1
+    
+    _, ax = plt.subplots(num_rows, num_cols, sharex=False )
+    #figsize=  (3 * num_cols, 3 * num_rows) )
+    
+    ax = ax.ravel()
+    
+    plot_index = 0
+    
+    for exp_tag in w_norms_dict.keys():
+        
+        max_val = np.max(w_norms_dict[exp_tag]) +10
+    
+        iters = range(len(w_norms_dict[exp_tag]))
+        
+        ax[plot_index].set_title(exp_tag, size = 13) 
+        
+        ax[plot_index].plot(iters, w_norms_dict[exp_tag])
+        
+        ax[plot_index].set_xlabel('Iteration number')
+    
+        ax[plot_index].set_ylabel('L2-norm on W')
+        
+        ax[plot_index].yaxis.set_ticks(np.arange(0, max_val, max_val//5))
+        
+        plot_index +=1
+    
+    plt.tight_layout()
+    
+    plt.savefig(save_to_path)
+       
     plt.clf()
     
 if __name__ == "__main__":

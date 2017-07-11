@@ -35,6 +35,7 @@ class BoltzmannMachine(object):
                  b0= None, 
                  bhid0 = None,
                  report_p_tilda =False,
+                 learn_biases = True,
                  test_mode= False,
                  training = True):
         
@@ -73,6 +74,8 @@ class BoltzmannMachine(object):
         
         self.is_probs       = []
         
+        self.learn_biases   = learn_biases
+        
         if isinstance(algorithm_dict, dict):
         
            for param in algorithm_dict.keys():
@@ -101,9 +104,15 @@ class BoltzmannMachine(object):
                 
                   self.data_samples = algorithm_dict[param]
                   
-               if param == "is_probs":
-                   
-                  self.is_probs  = algorithm_dict[param]
+               if param == "alpha":
+                  
+                  alpha = algorithm_dict[param]
+                  
+                  self.is_probs= (1-alpha)*0.5*np.ones([1,self.num_vars])+\
+                                  alpha*np.mean(training_inputs,0)
+                                  
+                  self.is_probs = \
+                  np.asarray(self.is_probs, dtype = theano.config.floatX)
                                                  
         if self.is_probs != []:
            
@@ -284,18 +293,19 @@ class BoltzmannMachine(object):
         
            self.sample_set      = T.ivector('sample_set')
            
-           if self.algorithm == "CD" and self.num_hidden ==0:
+           if (self.algorithm == "CD" or self.algorithm=="PCD")\
+            and self.num_hidden ==0:
            
-              self.x_gibbs= theano.shared(np.zeros([self.batch_size,self.num_vars],
+              self.x_gibbs= theano.shared(np.ones([self.batch_size,self.num_vars],
                                           dtype=theano.config.floatX),
                                           borrow = True, name= "x_gibbs")
                                           
            if self.algorithm =="PCD" and self.num_hidden > 0:
               
-              self.persistent_gibbs=\
+              self.x_gibbs_rbm =\
                theano.shared(np.ones([self.batch_size,self.num_hidden],
-                                       dtype=theano.config.floatX),
-                                      borrow = True, name= "persistent_gibbs")
+                                     dtype=theano.config.floatX),
+                                     borrow = True, name= "persistent_gibbs")
               
            if self.algorithm == "CSS" and self.use_is  != True:
               
@@ -476,11 +486,11 @@ class BoltzmannMachine(object):
         using uniform importances sampling."""
         
         if self.is_probs == []:
-        
+           print("Given importance distribution is uniform")
            weight_term = T.log(self.num_samples) + self.num_vars*T.log(0.5)
            
         else:
-           
+           print("Given importance distribution is not uniform")
            weight_term = T.log(self.num_samples)+\
              self.get_importance_evals(T.transpose(self.x_tilda), 
                                        np.transpose(self.is_probs))
@@ -528,7 +538,7 @@ class BoltzmannMachine(object):
            
            if self.use_is:
                
-              print("Will use uniform importance sampling for Z approximation")
+              print("Will use importance sampling for Z approximation")
               
               approx_Z = self.add_is_approximation()
               
@@ -865,15 +875,18 @@ class BoltzmannMachine(object):
               
            normalizer_term = self.add_css_approximation(data_term)
                
-        if self.algorithm =="CD" and self.num_hidden ==0:
+        if (self.algorithm =="CD" or self.algorithm =="PCD")\
+         and self.num_hidden ==0:
             
            data_term = self.compute_energy(self.x, self.batch_size)
            
-           normalizer_term = self.compute_energy(self.x_gibbs, self.batch_size)
+           normalizer_term = self.compute_energy(self.x_gibbs, 
+                                                 self.batch_size)
            
            normalizer_term = -T.mean(normalizer_term)
            
-        if (self.algorithm =="PCD" or self.algorithm == "CD") and self.num_hidden > 0:
+        if (self.algorithm =="PCD" or self.algorithm == "CD")\
+         and self.num_hidden > 0:
            
            data_term = self.compute_free_energy(self.x)
             
@@ -897,7 +910,7 @@ class BoltzmannMachine(object):
            
            if self.algorithm == "PCD":
               
-              init_chain  = self.persistent_gibbs
+              init_chain  = self.x_gibbs_rbm
                
            if self.algorithm == "CD":
             
@@ -929,16 +942,28 @@ class BoltzmannMachine(object):
         
     def get_cd_samples(self): 
         
-        """ function to obtain samples for CD approxmation for training
-        fully visible Boltzmann Machine"""
+        """ function to obtain samples for CD or PCD approxmation
+        for training fully visible Boltzmann Machine"""
         
-        get_samples = theano.function(inputs  = [self.minibatch_set],
-                                         outputs = [self.p_xi_given_x_[-1], 
-                                                 self.gibbs_samples[-1]], 
-                                         givens  = {self.x_gibbs: 
-                                         self.train_inputs[self.minibatch_set,:]},
-                                         #start the chain at the data distribution
-                                         updates = self.gibbs_updates)
+        if self.algorithm == "CD":
+            
+           input_vars = [self.minibatch_set]
+           
+           given_vars = {self.x_gibbs: self.train_inputs[self.minibatch_set,:]}
+           
+        if self.algorithm == "PCD":
+            
+           input_vars = []
+           
+           given_vars = []
+        
+        get_samples = theano.function(inputs  = input_vars,
+                                      outputs = [self.p_xi_given_x_[-1], 
+                                                 self.gibbs_samples[-1]
+                                                 ], 
+                                      givens  = given_vars,
+                                      #start the chain at the data distribution
+                                      updates = self.gibbs_updates)
                                          
         return get_samples
                                          
@@ -955,34 +980,40 @@ class BoltzmannMachine(object):
                grad = grad - T.diag(T.diag(grad)) # no x i - xi connections
                # for all i = 1, ..., D
                
-            if self.use_momentum:
-                
-               #g_tilda = self.momentum*self.grad_vec[target_param.name] - \
-               #self.learning_rate*grad
-                
-               #self.updates[target_param] = target_param + g_tilda
-               
-               g_tilda = self.momentum*self.grad_vec[target_param.name] - \
-               (1-self.momentum)*grad
-                
-               self.updates[target_param] = target_param +\
-                self.learning_rate*g_tilda
-               
-               # store g_tilda for next iteration:
-               
-               self.updates[self.grad_vec[target_param.name]] = g_tilda
-               
+            if target_param.name =="b" and self.learn_biases == False:
+               print("Will not learn bias terms")
+               pass
+            
+            elif target_param.name =="bhid" and self.learn_biases == False:
+               print("Will not learn bias terms")
+               pass
+            
             else:
                
-               self.updates[target_param] = target_param -\
-               self.learning_rate*grad
-            
-            ## or T.cast(lrate, dtype = theano.config.floatX) to 
-            ## guarantee compatibility with GPU
-            
+               if self.use_momentum:
+                  
+                  # alternative definition (mostly seen):
+                  #g_tilda = self.momentum*self.grad_vec[target_param.name] - \
+                  #T.cast(self.learning_rate, dtype = theano.config.floatX)*grad
+                  #self.updates[target_param] = target_param + g_tilda
+               
+                  g_tilda = self.momentum*self.grad_vec[target_param.name] - \
+                  (1-self.momentum)*grad
+                
+                  self.updates[target_param] = target_param +\
+                  T.cast(self.learning_rate, dtype = theano.config.floatX)*g_tilda
+               
+                  # store g_tilda for next iteration:
+                  self.updates[self.grad_vec[target_param.name]] = g_tilda
+               
+               else:
+               
+                  self.updates[target_param] = target_param -\
+                  T.cast(self.learning_rate, dtype = theano.config.floatX)*grad
+               
         if self.algorithm =="PCD" and self.num_hidden > 0:
            
-           self.updates[self.persistent_gibbs] = self.hid_samples
+           self.updates[self.x_gibbs_rbm] = self.hid_samples
            
     def select_data(self, minibatch_set):
         
@@ -1427,12 +1458,12 @@ class BoltzmannMachine(object):
         
         return np.log(pflip)*np.sum(x != y) + np.log(1.0-pflip)*np.sum(x == y)
         
-    def reconstruct_noisy_pixels(self,
-                                 num_iters,
-                                 correct_images,
-                                 recon_images,
-                                 noisy_images,
-                                 pflip):
+    def reconstruct_noisy(self,
+                          num_iters,
+                          correct_images,
+                          recon_images,
+                          noisy_images,
+                          pflip):
                                 
         """ function to reconstruct images from noisy images """
         
@@ -1487,11 +1518,11 @@ class BoltzmannMachine(object):
                        
         return recon_images
         
-    def reconstruct_missing_pixels(self, 
-                                   num_iters, 
-                                   recon_images, 
-                                   which_pixels,
-                                   test_mode = False):
+    def reconstruct_missing(self, 
+                            num_iters, 
+                            recon_images, 
+                            which_pixels,
+                            test_mode = False):
     
         """ function to reconstruct images with missing pixels """
     
@@ -1714,7 +1745,14 @@ class BoltzmannMachine(object):
             
                       if self.algorithm == "CD":
                           
-                         mf_sample, cd_sample = self.cd_sampling(list(minibatch_inds))
+                         mf_sample, cd_sample =\
+                          self.cd_sampling(list(minibatch_inds))
+           
+                         self.x_gibbs.set_value(np.transpose(cd_sample))
+                        
+                      if self.algorithm == "PCD":
+                          
+                         mf_sample, cd_sample = self.cd_sampling()
            
                          self.x_gibbs.set_value(np.transpose(cd_sample))
                          
@@ -1727,8 +1765,7 @@ class BoltzmannMachine(object):
                    else:
                        
                       approx_cost, p_tilda = self.optimize(list(minibatch_inds),
-                                                           lrate_epoch,
-                                                           momentum_epoch)
+                                                           lrate_epoch)
         
                 avg_pseudo_cost_val.append(approx_cost)
                 

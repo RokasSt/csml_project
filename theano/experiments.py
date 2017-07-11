@@ -15,7 +15,7 @@ class Experiments(object):
          'data_samples' :   '0', # 0 means that only minibatch points
                 #will contribute to the data term of Z approximation.
          'num_samples'  :   '100',
-         'resample'     :   '1',  # '0' - do not resample for each minibatch point.
+         'resample'     :   '0',  # '0' - do not resample for each minibatch point.
          'momentum'     :   '0',
          'use_is'       :   '1',
          'algorithm'    :   'CSS',
