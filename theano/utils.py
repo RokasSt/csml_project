@@ -374,7 +374,10 @@ def compare_reconstructions(correct_images,
         
     plt.clf()
     
-def plot_w_norms(w_norms_dict, save_to_path, w_norms_std = None):
+def plot_w_norms(w_norms_dict, 
+                 save_to_path, 
+                 param_name ="", 
+                 w_norms_std = None):
     
     """plot temporal sequences of w norms"""
     
@@ -389,23 +392,50 @@ def plot_w_norms(w_norms_dict, save_to_path, w_norms_std = None):
     
     plot_index = 0
     
-    for exp_tag in w_norms_dict.keys():
-        
-        max_val = np.max(w_norms_dict[exp_tag]) +10
+    use_legend = False
     
-        iters = range(len(w_norms_dict[exp_tag]))
+    for exp_tag in w_norms_dict.keys():
         
         ax[plot_index].set_title(exp_tag, size = 13) 
         
-        if isinstance(w_norms_std, dict):
+        if not isinstance(w_norms_dict[exp_tag], dict):
         
-           ax[plot_index].errorbar(iters,
+           max_val = np.max(w_norms_dict[exp_tag]) +10
+    
+           iters = range(len(w_norms_dict[exp_tag]))
+           
+           if isinstance(w_norms_std, dict):
+        
+              ax[plot_index].errorbar(iters,
                                    w_norms_dict[exp_tag],
                                    yerr= w_norms_std[exp_tag])
                                    
+           else:
+            
+              ax[plot_index].plot(iters, w_norms_dict[exp_tag])
+              
         else:
             
-           ax[plot_index].plot(iters, w_norms_dict[exp_tag]) 
+           use_legend = True
+           
+           for x_val in w_norms_dict[exp_tag].keys():
+               
+               max_val = np.max(w_norms_dict[exp_tag][x_val]) +10
+    
+               iters = range(len(w_norms_dict[exp_tag][x_val]))
+               
+               if isinstance(w_norms_std, dict):
+        
+                  ax[plot_index].errorbar(iters,
+                                          w_norms_dict[exp_tag][x_val],
+                                          yerr= w_norms_std[exp_tag][x_val],
+                                          label = "%s %s"%(param_name,str(x_val)))
+                                   
+               else:
+            
+                  ax[plot_index].plot(iters, 
+                                      w_norms_dict[exp_tag][x_val],
+                                      label ="%s %s"%(param_name,str(x_val)))
         
         ax[plot_index].set_xlabel('Iteration number')
     
@@ -414,10 +444,219 @@ def plot_w_norms(w_norms_dict, save_to_path, w_norms_std = None):
         ax[plot_index].yaxis.set_ticks(np.arange(0, max_val, max_val//5))
         
         plot_index +=1
+        
+    if use_legend:
+        
+       plt.legend(loc='lower center', 
+                  bbox_to_anchor=(0.5, -1.2),
+                  ncol = 3)
+                  #borderaxespad=0.)
     
     plt.tight_layout()
     
+    plt.savefig(save_to_path, bbox_inches='tight')
+       
+    plt.clf()
+    
+def process_err_dict(means_dict, 
+                     std_dict, 
+                     update_dict, 
+                     bar_plots = True):
+    
+    """ function to process error dictionary into lists for bar plots"""
+    
+    if bar_plots == True:
+    
+       output_dict                      = {}
+       output_dict['MISSING']           = {}
+       output_dict['NOISY']             = {}
+    
+       output_dict['LABELS']            = []
+    
+       output_dict['MISSING']['MEANS']  = []
+    
+       output_dict['MISSING']['STD']    = []
+    
+       output_dict['NOISY']['MEANS']    = []
+    
+       output_dict['NOISY']['STD']      = []
+
+       for alg in means_dict.keys():
+    
+           output_dict['LABELS'].append(alg)
+        
+           output_dict['MISSING']['MEANS'].append(means_dict[alg]['MISSING'])
+    
+           output_dict['MISSING']['STD'].append(std_dict[alg]['MISSING'])
+    
+           output_dict['NOISY']['MEANS'].append(means_dict[alg]['NOISY'])
+    
+           output_dict['NOISY']['STD'].append(std_dict[alg]['NOISY'])
+        
+       return output_dict
+       
+    else:
+       ## initialize update_dict if it is empty 
+       if update_dict.keys() == []:
+              
+          update_dict['NOISY']   = {}
+          
+          update_dict['MISSING'] = {}
+          
+          for alg in means_dict.keys():
+          
+              update_dict['NOISY'][alg]   = {}
+          
+              update_dict['MISSING'][alg] = {}
+              
+              update_dict['NOISY'][alg]['MEANS']  = []
+          
+              update_dict['NOISY'][alg]['STD']  = []
+              
+              update_dict['MISSING'][alg]['MEANS']  = []
+          
+              update_dict['MISSING'][alg]['STD']  = []
+              
+       for alg in means_dict.keys():   
+               
+           mean_val = means_dict[alg]['MISSING']
+              
+           update_dict['MISSING'][alg]['MEANS'].append(mean_val)
+          
+           std_val = std_dict[alg]['MISSING']
+          
+           update_dict['MISSING'][alg]['STD'].append(std_val)
+          
+           mean_val = means_dict[alg]['NOISY']
+              
+           update_dict['NOISY'][alg]['MEANS'].append(mean_val)
+          
+           std_val = std_dict[alg]['NOISY']
+          
+           update_dict['NOISY'][alg]['STD'].append(std_val)
+           
+       return update_dict  
+#######################################################################
+def generate_bar_plots(array_dict, 
+                       num_exps, 
+                       save_to_path,
+                       plot_std = True):
+    
+    """ function to generate bar plots """    
+    fig, ax = plt.subplots(1, 2, sharex=False)
+
+    ax = ax.ravel()
+
+    width = 0.7
+    
+    x_axis   = np.arange(num_exps)
+    
+    ordered_labels = array_dict['LABELS']
+    
+    plot_index =0
+    
+    for key in array_dict.keys():
+    
+        if key !=  'LABELS':
+            
+           str_spec = key.lower()
+           
+           if plot_std:
+    
+              ax[plot_index].bar(x_axis, 
+                                 array_dict[key]['MEANS'], 
+                                 width = width, 
+                                 color = 'b', 
+                                 yerr  = array_dict[key]['STD'])
+                                 
+           else:
+               
+              ax[plot_index].bar(x_axis, 
+                                 array_dict[key]['MEANS'], 
+                                 width = width, 
+                                 color = 'b')
+
+           ax[plot_index].set_ylabel('Mean Reconstruction Errors')
+           ax[plot_index].set_xticks(x_axis + width / 2)
+           ax[plot_index].set_xticklabels(ordered_labels)
+           ax[plot_index].set_title('Reconstruction of %s pixels'%str_spec)
+           
+           plot_index +=1
+           
+    plt.tight_layout()
     plt.savefig(save_to_path)
+    plt.clf()
+########################################################################
+def plot_regressions(y_dict, 
+                     x_values,
+                     x_label,
+                     y_label, 
+                     save_to_path,
+                     plot_std = False):
+                         
+    """ function to generate regression plots """
+    
+    num_exps = len(y_dict.keys())
+    
+    num_cols = num_exps
+    
+    _, ax = plt.subplots(1, num_cols, sharex=False )
+    #figsize=  ( 1*num_cols, 1*num_rows) )
+    
+    ax = ax.ravel()
+    
+    plot_index = 0
+    
+    sorting_inds = list(np.argsort(x_values))
+    
+    x_values     = np.sort(x_values)
+    
+    for exp_type in y_dict.keys():
+        
+        max_val = 0
+        
+        for alg in y_dict[exp_type].keys():
+            
+            y_values = np.array(y_dict[exp_type][alg]['MEANS'])
+            
+            y_values = y_values[sorting_inds]
+            
+            max_val_check = np.max(y_values)
+            
+            if max_val_check > max_val:
+                
+               max_val = max_val_check
+            
+            if plot_std:
+               std_y_values = np.array(y_dict[exp_type][alg]['STD'])
+               std_y_values = std_y_values[sorting_inds]
+               ax[plot_index].errorbar(x_values,
+                                       y_values,
+                                       yerr  = std_y_values,
+                                       label = "%s"%alg)
+            else:
+            
+               ax[plot_index].plot(x_values, 
+                                   y_values,
+                                   label ="%s"%alg)
+        
+        ax[plot_index].set_xlabel(x_label)
+    
+        ax[plot_index].set_ylabel(y_label)
+        
+        str_spec = exp_type.lower()
+        
+        ax[plot_index].set_title('Reconstruction of %s pixels'%str_spec)
+        
+        ax[plot_index].yaxis.set_ticks(np.arange(0, max_val+50, (max_val+50)//5))
+        
+        plot_index +=1
+        
+    plt.legend(loc='lower center', bbox_to_anchor=(0.05, -0.2), ncol = 5)
+    
+    plt.tight_layout()
+    
+    plt.savefig(save_to_path, bbox_inches='tight')
        
     plt.clf()
     
