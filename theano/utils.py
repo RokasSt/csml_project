@@ -373,11 +373,13 @@ def compare_reconstructions(correct_images,
     plt.savefig(save_to_path)
         
     plt.clf()
-    
-def plot_w_norms(w_norms_dict, 
-                 save_to_path, 
-                 param_name ="", 
-                 w_norms_std = None):
+##########################################################################    
+def plot_sequences(mean_dict, 
+                   xlabel_dict,
+                   ylabel_dict,
+                   save_to_path, 
+                   param_name ="", 
+                   std_dict = None):
     
     """plot temporal sequences of w norms"""
     
@@ -437,9 +439,9 @@ def plot_w_norms(w_norms_dict,
                                       w_norms_dict[exp_tag][x_val],
                                       label ="%s %s"%(param_name,str(x_val)))
         
-        ax[plot_index].set_xlabel('Iteration number')
+        ax[plot_index].set_xlabel(xlabel_dict[exp_tag])
     
-        ax[plot_index].set_ylabel('L2-norm on W')
+        ax[plot_index].set_ylabel(ylabel_dict[exp_tag])
         
         ax[plot_index].yaxis.set_ticks(np.arange(0, max_val, max_val//5))
         

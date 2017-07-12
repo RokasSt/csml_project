@@ -22,6 +22,8 @@ arg_parser.add_argument('--avg_w_norms', type=str,required= True)
 
 arg_parser.add_argument('--avg_recon_errors', type=str,required= True)
 
+arg_parser.add_argument('--avg_p_tilda', type=str,required= True)
+
 arg_parser.add_argument('--regressor_name', type=str,required= False)
 
 arg_parser.add_argument('--algorithm_specific', type=str,required= False)
@@ -35,6 +37,8 @@ target_dir  = FLAGS.target_dir
 avg_w_norms        = bool(int(FLAGS.avg_w_norms))
 
 avg_recon_errors   = bool(int(FLAGS.avg_recon_errors))
+
+avg_p_tilda        = bool(int(FLAGS.avg_p_tilda))
 
 regressor_name     = FLAGS.regressor_name
 
@@ -72,53 +76,61 @@ else:
    all_target_dirs.append(target_dir)
 
 ###########################################################################
-def add_w_norm(path_to_check,
-               norms_dict,
-               algorithm,
-               param_value):
+def add_data(target_path,
+             look_at_dict,
+             algorithm,
+             param_value,
+             avg_axis = None):
                    
-    """ function to add sum temporal sequences of W norms
-    for plotting their averages """
+    """ function to extract temporal sequences of measurements from the 
+    target file for plotting purposes"""
 
-    check_w_file = os.path.join(path_to_check, "W_NORMS.dat")
-                   
-    if os.path.exists(check_w_file):
+    if os.path.exists(target_path):
                       
-       w_norms = np.loadtxt(check_w_file)
+       X = np.loadtxt(target_path)
        
-       w_norms = np.reshape(w_norms,[1,-1])
+       if len(X.shape) == 1:
        
-       if algorithm in norms_dict.keys():
+          X = np.reshape(X,[1,-1])
+          
+       elif len(X.shape) == 2:
+           
+          assert avg_axis != None
+           
+          X = np.mean(X, axis = avg_axis)
+          
+          X = np.reshape(X, [1,-1])
+       
+       if field in look_at_dict.keys():
            
           if param_value != None and \
-          (param_value in norms_dict[algorithm].keys()):
+          (param_value in look_at_dict[field].keys()):
              
-             norms_dict[algorithm][param_value] =\
-             np.vstack((norms_dict[algorithm][param_value], w_norms))
+             look_at_dict[field][param_value] =\
+             np.vstack((look_at_dict[field][param_value], X))
              
           elif param_value != None and \
-          (param_value not in norms_dict[algorithm].keys()):
+          (param_value not in look_at_dict[field].keys()):
             
-             norms_dict[algorithm][param_value] = w_norms
+             look_at_dict[field][param_value] = X
           
           else:
              
-             norms_dict[algorithm] = \
-             np.vstack((norms_dict[algorithm], w_norms))
+             look_at_dict[field] = np.vstack((look_at_dict[field], X))
           
        else:
           
           if param_value != None:
               
-             norms_dict[algorithm] ={}
+             look_at_dict[field] ={}
              
-             norms_dict[algorithm][param_value] = w_norms 
+             look_at_dict[field][param_value] = X
         
           else:
            
-             norms_dict[algorithm] = w_norms
+             look_at_dict[field] = X
           
-    return norms_dict
+    return look_at_dict
 ##############################################################################  
 def get_regressor_value(target_path, 
                         param_name,
@@ -168,15 +180,20 @@ def get_regressor_value(target_path,
           
     return param_value
 ##########################################################################
-def plot_avg_w_norms(list_target_dirs,
-                     list_experiments,
-                     regressor= None,
-                     algorithm_spec = None,
-                     error_bars = False):
+def plot_temporal_data(list_target_dirs,
+                       target_dict,
+                       xlabel_dict,
+                       ylabel_dict,
+                       file_name,
+                       param_dict_name,
+                       regressor= None,
+                       algorithm_spec = None,
+                       average_over_axis = None
+                       error_bars = False):
     
     """ function to generate plots of w norms averaged over multiple runs"""
     
-    w_norms_all = {}
+    records_all = {}
     
     num_runs = 0
     
@@ -185,7 +202,7 @@ def plot_avg_w_norms(list_target_dirs,
         if isinstance(regressor, str) and isinstance(algorithm_spec, bool):
            regressor = regressor.lower() 
            print("Regressor is specified: %s"%regressor)
-           path_to_params = os.path.join(target_dir, "PARAMETERS.json")
+           path_to_params = os.path.join(target_dir, param_dict_name)
            
            regressor_val = get_regressor_value(path_to_params, 
                                                regressor,
@@ -201,7 +218,7 @@ def plot_avg_w_norms(list_target_dirs,
     
             selected_path = os.path.join(target_dir, sub_folder)
     
-            if os.path.isdir(selected_path) and "run" in sub_folder:
+            if os.path.isdir(selected_path): # and "run" in sub_folder:
     
                print("Processing %s"%sub_folder)
               
@@ -213,99 +230,93 @@ def plot_avg_w_norms(list_target_dirs,
                
                    check_path = os.path.join(selected_path, sub_item)
                
-                   if os.path.isdir(check_path) and ("CSS" in sub_item)\
-                   and ("CSS" in list_experiments):
+                   if os.path.isdir(check_path):
+                       
+                      for field in target_dir.keys():
+                          
+                          if field in sub_item:
+                              
+                             check_file = os.path.join(check_path, 
+                                                target_dict[field])
                    
-                      w_norms_all = add_w_norm(path_to_check  = check_path, 
-                                               norms_dict     = w_norms_all,
-                                               algorithm      = "CSS",
-                                               param_value    = regressor_val) 
-                    
-                   if os.path.isdir(check_path) and ("CD" in sub_item)\
-                   and ("CD" in list_experiments):
-                     
-                      w_norms_all = add_w_norm(path_to_check  = check_path, 
-                                               norms_dict     = w_norms_all,
-                                               algorithm      = "CD",
-                                               param_value    = regressor_val)  
-                   
-                   if os.path.isdir(check_path) and ("PCD" in sub_item)\
-                   and ("PCD" in list_experiments):
-                      
-                      w_norms_all = add_w_norm(path_to_check  = check_path, 
-                                               norms_dict     = w_norms_all,
-                                               algorithm      = "PCD",
-                                               param_value    = regressor_val) 
-          
+                             records_all = add_data(target_path = check_file, 
+                                                    look_at_dict= records_all,
+                                                    target      = field,
+                                                    param_value = regressor_val,
+                                                    avg_axis = average_over_axis)
+                              ### break inner for loop once field found                       
+                              break
+        
         if len(list_target_dirs) == 1 and regressor_val == None:
             
            if error_bars:
             
-              w_norms_std = {}
+              all_records_std = {}
              
            else:
                
-               w_norms_std = None
+              all_records_std = None
            
-           for algorithm in w_norms_all.keys():
+           for field in all_records.keys():
                
-               if isinstance(w_norms_std, dict):
+               if isinstance(all_records_std, dict):
     
-                  w_norms_std[algorithm] = \
-                  np.std(w_norms_all[algorithm], axis= 0)
+                  all_records_std[field] = np.std(all_records[field], axis= 0)
     
-               w_norms_all[algorithm] = \
-               np.mean(w_norms_all[algorithm], axis =0)
+               all_records[field] = np.mean(all_records[field], axis =0)
                
-           save_plot_path = os.path.join(target_dir, "MEAN_W_NORMS.jpeg")
-                                              
-           utils.plot_w_norms(w_norms_all, save_plot_path, w_norms_std)
+           save_plot_path = os.path.join(target_dir, "%s.jpeg"%file_name)
+           
+           utils.plot_sequences(mean_dict    = all_records, 
+                                xlabel_dict  = xlabel_dict,
+                                ylabel_dict  = ylabel_dict,
+                                save_to_path = save_plot_path,
+                                std_dict     = all_records_std)
+           
            
     if len(list_target_dirs) > 1 and regressor_val != None:
         
        if error_bars:
-            
-          w_norms_std = {}
-             
+          all_records_std = {}
        else:
-               
-          w_norms_std = None
+          all_records_std = None
            
-       for algorithm in w_norms_all.keys():
+       for algorithm in all_records.keys():
            
            if error_bars:
                
-              w_norms_std[algorithm] = {}
+              all_records_std[algorithm] = {}
               
-           for x in w_norms_all[algorithm].keys():
+           for x in all_records[algorithm].keys():
                
                if error_bars:
     
-                  w_norms_std[algorithm][x] = \
-                  np.std(w_norms_all[algorithm][x], axis= 0)
+                  all_records_std[algorithm][x] = \
+                  np.std(all_records[algorithm][x], axis= 0)
     
-               w_norms_all[algorithm][x] = \
-               np.mean(w_norms_all[algorithm][x], axis =0)
+               all_records[algorithm][x] = \
+               np.mean(all_records[algorithm][x], axis =0)
                
        root_dir = os.path.split(list_target_dirs[0])[0]
        
        save_plot_path = os.path.join(root_dir, 
-                                     "MEAN_W_NORMS_%s.jpeg"%regressor)
-       
-       utils.plot_w_norms(w_norms_dict = w_norms_all, 
-                          save_to_path = save_plot_path,
-                          param_name   = regressor,
-                          w_norms_std  = w_norms_std)
+                                     "%s_%s.jpeg"%(file_name,regressor))
+       # plot_w_norms -> plot_sequences
+       utils.plot_sequences(mean_dict    = all_records, 
+                            xlabel_dict  = xlabel_dict,
+                            ylabel_dict  = ylabel_dict,
+                            save_to_path = save_plot_path,
+                            param_name   = regressor,
+                            std_dict     = all_records_std)
 ########################################################################
 def plot_recon_errors(list_target_dirs,
                       list_experiments,
+                      param_dict_name,
                       regressor= None,
                       algorithm_spec = None,
                       error_bars = False):
     
     """ function to generate plots of w norms averaged over multiple runs"""
-    
-    w_norms_all = {}
     
     num_runs = 0
     
@@ -318,7 +329,7 @@ def plot_recon_errors(list_target_dirs,
         if isinstance(regressor, str) and isinstance(algorithm_spec, bool):
            regressor = regressor.lower() 
            print("Regressor is specified: %s"%regressor)
-           path_to_params = os.path.join(target_dir, "PARAMETERS.json")
+           path_to_params = os.path.join(target_dir, param_dict_name)
            
            regressor_val = get_regressor_value(path_to_params, 
                                                regressor,
@@ -389,26 +400,66 @@ def plot_recon_errors(list_target_dirs,
                               save_to_path = save_plot_to,
                               x_label  = regressor,
                               y_label  = "Reconstruction Errors",
-                              plot_std = error_bars)                                              
-           
+                              plot_std = error_bars)                                                       
 ########################################################################
 if __name__ == "__main__":
    if avg_w_norms:
       print("Will generate plots of w norms averaged over multiple runs")
-      plot_avg_w_norms(list_target_dirs = all_target_dirs,
-                       list_experiments = ["CSS", "PCD", "CD"],
-                       regressor        = regressor_name,
-                       algorithm_spec   = algorithm_specific,
-                       error_bars       = False)
+      plot_temporal_data(list_target_dirs = all_target_dirs,
+                         target_dict = {"CSS":"W_NORMS.dat",
+                                        "PCD":"W_NORMS.dat",
+                                        "CD": "W_NORMS.dat",
+                                        },
+                         xlabel_dict = {"CSS":'Iteration number',
+                                        "PCD":'Iteration number',
+                                        "CD":'Iteration number',
+                                        },
+                         ylabel_dict = {"CSS":'L2-norm on W',
+                                        "PCD":'L2-norm on W',
+                                        "CD" :'L2-norm on W',
+                                        },
+                         file_name        = "MEAN_W_NORMS",
+                         param_dict_name  = "PARAMETERS.json",
+                         regressor        = regressor_name,
+                         algorithm_spec   = algorithm_specific,
+                         average_over_axis= None,
+                         error_bars       = False)
                        
    if avg_recon_errors:
       print("Will generate plots of reconstruction errors")
       
       plot_recon_errors(list_target_dirs = all_target_dirs,
                         list_experiments = ["CSS", "PCD", "CD"],
+                        param_dict_name  = "PARAMETERS.json",
                         regressor        = regressor_name,
                         algorithm_spec   = algorithm_specific,
                         error_bars       = True)
+                        
+   if avg_p_tilda:
+      print("Will generate plots of p tilda values over training time"+\
+      " averaged over training points")
+      
+      plot_temporal_data(list_target_dirs = all_target_dirs,
+                         target_dict = {"CSS":"TRAIN_P_TILDA.dat",
+                                        "PCD":"TRAIN_PSEUDO_LOSSES.dat",
+                                         "CD" :"TRAIN_PSEUDO_LOSSES.dat",
+                                        },
+                         xlabel_dict = {"CSS":'Iteration number',
+                                        "PCD":'Iteration number',
+                                        "CD":'Iteration number',
+                                        },
+                         ylabel_dict = {"CSS":'Average P tilda',
+                                        "PCD":'Average pseudo likelihood',
+                                        "CD" :'Average pseudo likelihood',
+                                        },
+                         file_name        = "LEARNING_CURVES",
+                         param_dict_name  = "PARAMETERS.json",
+                         regressor        = regressor_name,
+                         algorithm_spec   = algorithm_specific,
+                         average_over_axis= 1,
+                         error_bars       = False)
+      
+      
       
       
       
