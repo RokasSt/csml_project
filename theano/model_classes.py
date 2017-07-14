@@ -13,7 +13,7 @@ import numpy as np
 import cPickle
 import Image
 import sys
-from   utils import make_raster_plots
+from   plot_utils import make_raster_plots
 from   collections import OrderedDict
 import timeit
 import os
@@ -1494,7 +1494,6 @@ class BoltzmannMachine(object):
             Emax = E_model + E_noise
             
             for iter_ind in range(num_iters):
-                print("Iteration ----- %d"%iter_ind)
                 
                 permuted_nodes = list(np.random.permutation(self.num_vars))
         

@@ -149,7 +149,7 @@ if __name__ == "__main__":
                                     regressor        = regressor_name,
                                     algorithm_spec   = algorithm_specific,
                                     average_over_axis= 1,
-                                    end_values       = True,
+                                    end_values_dict  = {"CSS":'P tilda'},
                                     error_bars       = False)
       
       

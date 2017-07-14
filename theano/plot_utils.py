@@ -15,6 +15,7 @@ import sys
 import json
 import argparse
 import numpy as np
+import utils
 
 def make_raster_plots(images, 
                       num_samples, 
@@ -147,8 +148,8 @@ def plot_reconstructions(correct_images,
             
         plot_index += 1
     
-        dist_val = hamming_distance(correct_images[xi,:], 
-                                    reconstructed_images[xi,:])
+        dist_val = utils.hamming_distance(correct_images[xi,:], 
+                                          reconstructed_images[xi,:])
                                       
         print("Image --- %d ----"%xi+\
         " hamming distance between the true image and "+\
@@ -177,7 +178,7 @@ def compare_reconstructions(correct_images,
     
     num_cols = num_reconstruct
     
-    _, ax = plt.subplots(num_rows, num_cols, sharex=False ,
+    _, ax = plt.subplots(num_rows, num_cols, sharex=False,
     figsize=  (3 * num_cols, 3 * num_rows) )
     
     ax = ax.ravel()
@@ -245,14 +246,14 @@ def plot_sequences(means_dict,
                    param_name ="", 
                    std_dict = None):
     
-    """plot temporal sequences of w norms"""
+    """function to plot temporal sequences"""
     
     num_rows = len(means_dict.keys())
     
     num_cols = 1
     
-    _, ax = plt.subplots(num_rows, num_cols, sharex=False )
-    #figsize=  ( 1*num_cols, 1*num_rows) )
+    _, ax = plt.subplots(num_rows, num_cols, sharex=False,
+    figsize=  ( 9*num_cols, 3*num_rows) )
     
     ax = ax.ravel()
     
@@ -274,7 +275,7 @@ def plot_sequences(means_dict,
            
            iters = range(len(means_dict[exp_tag]))
            
-           if isinstance(means_std, dict):
+           if isinstance(std_dict, dict):
         
               ax[plot_index].errorbar(iters,
                                       means_dict[exp_tag],
@@ -330,7 +331,7 @@ def plot_sequences(means_dict,
     if use_legend:
         
        plt.legend(loc='lower center', 
-                  bbox_to_anchor=(0.5, -1.2),
+                  bbox_to_anchor=(0.5, -0.8),
                   ncol = 3)
                   #borderaxespad=0.)
     
@@ -349,22 +350,23 @@ def plot_end_values(means_dict,
     
     """plot last values from the learning curves"""
     
-    num_rows = len(means_dict.keys())
+    num_rows = len(ylabel_dict.keys())
     
     num_cols = 1
     
-    _, ax = plt.subplots(num_rows, num_cols, sharex=False )
+    _, ax = plt.subplots(num_rows, num_cols, sharex=False)
     #figsize=  ( 1*num_cols, 1*num_rows) )
     
-    ax = ax.ravel()
+    use_indexing = False
+    if num_rows > 1 or num_cols > 1: 
+       use_indexing = True
+       ax = ax.ravel()
     
     plot_index = 0
     
     width = 0.7
     
-    for exp_tag in means_dict.keys():
-        
-        ax[plot_index].set_title(exp_tag, size = 13) 
+    for exp_tag in ylabel_dict.keys():
         
         y_axis     = []
         
@@ -404,25 +406,45 @@ def plot_end_values(means_dict,
         y_axis       = np.array(y_axis)
         
         y_axis       = y_axis[sorting_inds]
-               
-        if y_axis_std != []:
+        
+        if use_indexing:
+           if y_axis_std != []:
            
-           ax[plot_index].errorbar(x_axis,
-                                   y_axis,
-                                   yerr  = y_axis_std)
-        else:
+              ax[plot_index].errorbar(x_axis, y_axis, yerr  = y_axis_std)
+              
+           else:
             
-           ax[plot_index].plot(x_axis, 
-                               y_axis)
+              ax[plot_index].plot(x_axis, y_axis)
+                               
+                               
+           ax[plot_index].set_title(exp_tag, size = 13)  
         
-        ax[plot_index].set_xlabel(param_name)
+           ax[plot_index].set_xlabel(param_name)
     
-        ax[plot_index].set_ylabel(ylabel_dict[exp_tag])
+           ax[plot_index].set_ylabel(ylabel_dict[exp_tag])
         
-        ax[plot_index].locator_params(nbins=8, axis='y')
+           ax[plot_index].locator_params(nbins=8, axis='y')
         
-        plot_index +=1
+           plot_index +=1
+           
+        else:
         
+           if y_axis_std != []:
+           
+              ax.errorbar(x_axis, y_axis, yerr  = y_axis_std)
+              
+           else:
+            
+              ax.plot(x_axis, y_axis)
+                               
+           ax.set_title(exp_tag, size = 13)  
+        
+           ax.set_xlabel(param_name)
+    
+           ax.set_ylabel(ylabel_dict[exp_tag])
+        
+           ax.locator_params(nbins=8, axis='y')
+           
     plt.tight_layout()
     
     plt.savefig(save_to_path, bbox_inches='tight')
@@ -431,7 +453,7 @@ def plot_end_values(means_dict,
 ##########################################################################    
 def process_err_dict(means_dict, 
                      std_dict, 
-                     update_dict, 
+                     update_dict = None, 
                      bar_plots = True):
     
     """ function to process error dictionary into lists for plotting"""
@@ -453,17 +475,44 @@ def process_err_dict(means_dict,
        output_dict['NOISY']['STD']      = []
 
        for alg in means_dict.keys():
+           
+           if (not isinstance(means_dict[alg]['MISSING'], dict)) and\
+           (not isinstance(means_dict[alg]['NOISY'], dict)):
     
-           output_dict['LABELS'].append(alg)
+              output_dict['LABELS'].append(alg)
         
-           output_dict['MISSING']['MEANS'].append(means_dict[alg]['MISSING'])
+              output_dict['MISSING']['MEANS'].append(means_dict[alg]['MISSING'])
     
-           output_dict['MISSING']['STD'].append(std_dict[alg]['MISSING'])
+              output_dict['MISSING']['STD'].append(std_dict[alg]['MISSING'])
     
-           output_dict['NOISY']['MEANS'].append(means_dict[alg]['NOISY'])
+              output_dict['NOISY']['MEANS'].append(means_dict[alg]['NOISY'])
     
-           output_dict['NOISY']['STD'].append(std_dict[alg]['NOISY'])
-        
+              output_dict['NOISY']['STD'].append(std_dict[alg]['NOISY'])
+              
+           else:
+               
+              #### assumes that both "MISSING" and "NOISY" fields
+              #### share the same set subfields
+              for field in means_dict[alg]['MISSING'].keys():
+                  
+                  output_dict['LABELS'].append("%s %s"(alg,field))
+                  
+                  mean_val = means_dict[alg]['MISSING'][field]
+                  
+                  output_dict['MISSING']['MEANS'].append(mean_val)
+                  
+                  std_val  = std_dict[alg]['MISSING'][field]
+    
+                  output_dict['MISSING']['STD'].append(std_val)
+                  
+                  mean_val = means_dict[alg]['NOISY'][field]
+    
+                  output_dict['NOISY']['MEANS'].append(mean_val)
+                  
+                  std_val  = std_dict[alg]['NOISY'][field]
+    
+                  output_dict['NOISY']['STD'].append(std_val)
+                  
        return output_dict
        
     else:
@@ -586,6 +635,8 @@ def plot_regressions(y_dict,
         
         max_val = 0
         
+        min_val = 0
+        
         for alg in y_dict[exp_type].keys():
             
             y_values = np.array(y_dict[exp_type][alg]['MEANS'])
@@ -594,9 +645,15 @@ def plot_regressions(y_dict,
             
             max_val_check = np.max(y_values)
             
+            min_val_check = np.min(y_values)
+            
             if max_val_check > max_val:
                 
                max_val = max_val_check
+               
+            if min_val_check < min_val:
+                
+               min_val = min_val_check
             
             if plot_std:
                std_y_values = np.array(y_dict[exp_type][alg]['STD'])
@@ -619,7 +676,13 @@ def plot_regressions(y_dict,
         
         ax[plot_index].set_title('Reconstruction of %s pixels'%str_spec)
         
-        ax[plot_index].yaxis.set_ticks(np.arange(0, max_val+10, (max_val+10)//5))
+        #if min_val >= 0:
+        
+         #  ax[plot_index].yaxis.set_ticks(np.arange(0, max_val+5, (max_val+5)//5))
+           
+        #else:
+            
+        ax[plot_index].locator_params(nbins=8, axis='y')
         
         plot_index +=1
         
@@ -745,10 +808,10 @@ def plot_temporal_data(list_target_dirs,
                        regressor= None,
                        algorithm_spec = None,
                        average_over_axis = None,
-                       end_values = False,
+                       end_values_dict = None,
                        error_bars = False):
     
-    """ function to generate plots of w norms averaged over multiple runs"""
+    """ function to plot temporal data"""
     
     all_records = {}
     
@@ -865,14 +928,14 @@ def plot_temporal_data(list_target_dirs,
                       param_name   = regressor,
                       std_dict     = all_records_std)
                       
-       if end_values:
+       if end_values_dict != None:
                
           save_plot_path = os.path.join(root_dir, 
                                         "END_%s_%s.jpeg"%(file_name,regressor))
               
           plot_end_values(means_dict   = all_records, 
                           xlabel_dict  = xlabel_dict,
-                          ylabel_dict  = ylabel_dict,
+                          ylabel_dict  = end_values_dict,
                           save_to_path = save_plot_path, 
                           param_name   = regressor, 
                           std_dict     = all_records_std)

@@ -151,6 +151,42 @@ def select_subset(list_of_paths, n, D):
         selected_images[cli*n:(cli+1)*n,:] = cl_img[inds,:]
         
     return selected_images
+ 
+def get_means_and_stds(target_dict):
+    
+    """ function to compute means and standard deviations over
+    given set of arrays. Assumes that the maximum depth of dictionary
+    is 3 levels"""
+    
+    std_dict = {}
+    
+    for f1 in target_dict.keys():
+        
+        std_dict[f1] = {}
+        
+        if isinstance(target_dict[f1], dict):
+    
+           std_dict[f1] = {}
+           
+           for f2 in target_dict[f1].keys():
+               
+               if not isinstance(target_dict[f1][f2], dict):
+         
+                  std_dict[f1][f2] = np.std(target_dict[f1][f2])
+    
+                  target_dict[f1][f2] = np.mean(target_dict[f1][f2])
+    
+               else:
+                   
+                  std_dict[f1][f2] = {}
+                 
+                  for f3 in target_dict[f1][f2].keys():
+                      
+                      std_dict[f1][f2][f3] = np.std(target_dict[f1][f2][f3])
+    
+                      target_dict[f1][f2][f3]= np.mean(target_dict[f1][f2][f3])
+                      
+    return target_dict, std_dict
     
 if __name__ == "__main__":
     
