@@ -39,11 +39,11 @@ all_validate_images  = np.round(mnist.validation.images)
 
 all_validate_labels  = mnist.validation.labels
 
-def compare_algorithms(params ={'num_runs': 2,#20,
+def compare_algorithms(params ={'num_runs': 20,
                                 'N_train' : all_train_images.shape[0],
                                 'D': all_train_images.shape[1],
                                 'use_gpu': False,
-                                'num_epochs': 2, #1500,
+                                'num_epochs': 1500,
                                 'report_step':1,
                                 'save_every_epoch': False,
                                 'report_w_norm': True,
@@ -56,7 +56,7 @@ def compare_algorithms(params ={'num_runs': 2,#20,
                                 'num_hidden':0,
                                 'num_to_learn':10,
                                 'equal_per_classes':True,
-                                'init_type': 'ZEROS', # 'XAV' or 'NORM'
+                                'init_type'   :'ZEROS', # 'XAV' or 'NORM'
                                 'zero_diag'   : False,
                                 'learn_biases': False,
                                 'num_reconst_iters' :5,
@@ -257,6 +257,7 @@ def compare_algorithms(params ={'num_runs': 2,#20,
 
     num_algorithms = len(exps.keys())
     ################ prepare dictionary for average reconstruction errors
+    sub_count = 0
     for tag in exps.keys():
     
         avg_errors[exps[tag]['algorithm']] = {}
@@ -271,6 +272,8 @@ def compare_algorithms(params ={'num_runs': 2,#20,
            get_vals = exps[tag]['algorithm_dict'][var_name]
            
            assert isinstance(get_vals,list) == True
+           
+           sub_count += len(get_vals)
            
            avg_errors[exps[tag]['algorithm']]['MISSING'] = {}
            
@@ -293,6 +296,9 @@ def compare_algorithms(params ={'num_runs': 2,#20,
     
            avg_errors[exps[tag]['algorithm']]['NOISY'] = \
            np.zeros(params['num_runs'])
+           
+    if sub_count > 0:
+       sub_count -=1
     ####################################################################
     ### run experiments ################################################
     for run_index in range(params['num_runs']):
@@ -384,10 +390,6 @@ def compare_algorithms(params ={'num_runs': 2,#20,
            
                get_vals = exps[tag]['algorithm_dict'][loc_params['regressor']]
                
-               print(exps[tag]['algorithm_dict'])
-               
-               print(get_vals)
-               
                for val in get_vals:
                    
                    reconst_dict = None
@@ -426,6 +428,7 @@ def compare_algorithms(params ={'num_runs': 2,#20,
                                   exp_path        = exp_path,
                                   collect_w_norms = w_norms_all,
                                   collect_reconst  = reconst_dict)
+                                  
                    ##################### reset to the same init values #####             
                    W0 = np.copy(W0_stored)
                    b0 = np.copy(b0_stored)
@@ -476,7 +479,20 @@ def compare_algorithms(params ={'num_runs': 2,#20,
                               exp_path        = exp_path,
                               collect_w_norms = w_norms_all,
                               collect_reconst  = reconst_dict)
-        
+                              
+               ##################### reset to the same init values #####             
+               W0 = np.copy(W0_stored)
+               b0 = np.copy(b0_stored)
+               if params['num_hidden']:
+                  bhid0 = np.copy(bhid0_stored)
+               #### check initial parameters:
+               assert (W0_stored == W0).all() == True
+               assert (b0_stored == b0).all() == True
+               if params['num_hidden']:
+                  assert (bhid0_stored == bhid0).all() == True
+               if not params['learn_biases']:
+                  assert (bm_obj.b.get_value() == b0_stored).all()== True
+               ######################################################### 
                avg_errors[m_name]['MISSING'][run_index] =\
                np.mean(reconst_errors['MISSING'])
                avg_errors[m_name]['NOISY'][run_index] = \
@@ -529,7 +545,7 @@ def compare_algorithms(params ={'num_runs': 2,#20,
     save_bar_plots_to =  os.path.join(root_path,"BAR_ERRORS.jpeg")
 
     plot_utils.generate_bar_plots(array_dict   = dict_of_lists,
-                                  num_exps     = num_algorithms,            
+                                  num_exps     = num_algorithms+sub_count,            
                                   save_to_path = save_bar_plots_to,
                                   plot_std     = True)
 
@@ -543,7 +559,7 @@ if __name__ == "__main__":
                            'num_samples'   : 100,
                            'resample'      : False,  
                            'use_is'        : True,
-                           'alpha' : [0.5, 0.7, 0.3, 0.0, 0.995],
+                           'alpha': [0.5, 0.7, 0.3, 0.0, 0.995],
                            'mf_steps'      : 0
                            },
                   'report_p_tilda': True,
@@ -564,7 +580,8 @@ if __name__ == "__main__":
                   'regressor':None}
                        }
    
-   compare_algorithms(exps = exps)
+   compare_algorithms(exps = exps,
+                      experiment_id = "ALPHA_LIST")
    
    
 

@@ -72,7 +72,7 @@ if regressor_name != None:
 
    algorithm_specific = bool(int(FLAGS.algorithm_specific))
    
-   if not algorithmic_specific:
+   if not algorithm_specific:
    
       for sub_folder in os.listdir(target_dir):
        

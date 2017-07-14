@@ -495,23 +495,19 @@ def process_err_dict(means_dict,
               #### share the same set subfields
               for field in means_dict[alg]['MISSING'].keys():
                   
-                  output_dict['LABELS'].append("%s %s"(alg,field))
+                  output_dict['LABELS'].append("%s %s"%(alg,field))
                   
-                  mean_val = means_dict[alg]['MISSING'][field]
+                  output_dict['MISSING']['MEANS'].append(\
+                  means_dict[alg]['MISSING'][field])
                   
-                  output_dict['MISSING']['MEANS'].append(mean_val)
+                  output_dict['MISSING']['STD'].append(\
+                  std_dict[alg]['MISSING'][field])
                   
-                  std_val  = std_dict[alg]['MISSING'][field]
-    
-                  output_dict['MISSING']['STD'].append(std_val)
+                  output_dict['NOISY']['MEANS'].append(\
+                  means_dict[alg]['NOISY'][field])
                   
-                  mean_val = means_dict[alg]['NOISY'][field]
-    
-                  output_dict['NOISY']['MEANS'].append(mean_val)
-                  
-                  std_val  = std_dict[alg]['NOISY'][field]
-    
-                  output_dict['NOISY']['STD'].append(std_val)
+                  output_dict['NOISY']['STD'].append(\
+                  std_dict[alg]['NOISY'][field])
                   
        return output_dict
        
@@ -582,7 +578,7 @@ def generate_bar_plots(array_dict,
            str_spec = key.lower()
            
            if plot_std:
-    
+              
               ax[plot_index].bar(x_axis, 
                                  array_dict[key]['MEANS'], 
                                  width = width, 
@@ -598,7 +594,8 @@ def generate_bar_plots(array_dict,
 
            ax[plot_index].set_ylabel('Mean Reconstruction Errors')
            ax[plot_index].set_xticks(x_axis + width / 2)
-           ax[plot_index].set_xticklabels(ordered_labels)
+           ax[plot_index].set_xticklabels(ordered_labels,
+                                          rotation= "vertical")
            ax[plot_index].set_title('Reconstruction of %s pixels'%str_spec)
            
            plot_index +=1
@@ -843,6 +840,7 @@ def plot_temporal_data(list_target_dirs,
         else:
            print("Regressor is not specified")
            all_reg_values = [None]
+        print(all_reg_values)
         
         for sub_folder in os.listdir(target_dir):
     
@@ -863,30 +861,46 @@ def plot_temporal_data(list_target_dirs,
                    if os.path.isdir(check_path):
                        
                       for field in target_dict.keys():
-                          
+                          print(field)
                           if field in sub_item:
-                             
+                             print("%s is in %s"%(field, sub_item))
+                             found_regressor = False
                              for reg_val in all_reg_values:
                                  
                                  if str(reg_val) in sub_item or\
                                  len(all_reg_values) ==1:
                               
                                     check_file =\
-                                    os.path.join(check_path, target_dict[field])
-                   
+                                    os.path.join(check_path, 
+                                                 target_dict[field])
+                                    print("Processing %s"%check_file)
                                     all_records = \
                                     add_data(target_path = check_file, 
                                              look_at_dict= all_records,
                                              target_field = field,
                                              param_value = reg_val,
                                              avg_axis = average_over_axis)
+                                             
+                                    found_regressor = True
                                     break
-                                     
+                             if not found_regressor:
+                                for reg_val in all_reg_values:
+                                    check_file =\
+                                    os.path.join(check_path, target_dict[field])
+                                    print("Processing %s"%check_file)
+                                    all_records = \
+                                    add_data(target_path = check_file, 
+                                             look_at_dict= all_records,
+                                             target_field = field,
+                                             param_value = reg_val,
+                                             avg_axis = average_over_axis)
+                                    
                              ### break inner for loop once field found                       
                              break
-        
+                             
+        ###################################################################
         if len(list_target_dirs) == 1 and (not isinstance(regressor, str)):
-            
+           
            if error_bars:
             
               all_records_std = {}
@@ -904,13 +918,59 @@ def plot_temporal_data(list_target_dirs,
                all_records[field] = np.mean(all_records[field], axis =0)
                
            save_plot_path = os.path.join(target_dir, "%s.jpeg"%file_name)
-           
+           print(save_plot_path)
+           sys.exit()
            plot_sequences(means_dict   = all_records, 
                           xlabel_dict  = xlabel_dict,
                           ylabel_dict  = ylabel_dict,
                           save_to_path = save_plot_path,
                           std_dict     = all_records_std)
+        ################################################################
+        if len(list_target_dirs) == 1 and isinstance(regressor, str):  
+            
+           if error_bars:
+              all_records_std = {}
+           else:
+              all_records_std = None    
+              
+           for algorithm in all_records.keys():
            
+               if error_bars:
+                  all_records_std[algorithm] = {}
+              
+               for x in all_records[algorithm].keys():
+               
+                   if error_bars:
+                      all_records_std[algorithm][x] = \
+                      np.std(all_records[algorithm][x], axis= 0)
+    
+                   all_records[algorithm][x] = \
+                   np.mean(all_records[algorithm][x], axis =0)
+               
+           root_dir = os.path.split(list_target_dirs[0])[0]
+           print("Printing target directory: %s"%target_dir)
+           save_plot_path = os.path.join(target_dir, 
+                                     "%s_%s.jpeg"%(file_name,regressor))
+       
+           plot_sequences(means_dict   = all_records, 
+                          xlabel_dict  = xlabel_dict,
+                          ylabel_dict  = ylabel_dict,
+                          save_to_path = save_plot_path,
+                          param_name   = regressor,
+                          std_dict     = all_records_std)
+                          
+           if end_values_dict != None:
+               
+              save_plot_path = os.path.join(target_dir, 
+                                        "END_%s_%s.jpeg"%(file_name,regressor))
+              
+              plot_end_values(means_dict   = all_records, 
+                          xlabel_dict  = xlabel_dict,
+                          ylabel_dict  = end_values_dict,
+                          save_to_path = save_plot_path, 
+                          param_name   = regressor, 
+                          std_dict     = all_records_std)
+    ####################################################################
     if len(list_target_dirs) > 1 and isinstance(regressor, str):
         
        if error_bars:
