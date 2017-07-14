@@ -72,13 +72,19 @@ if regressor_name != None:
 
    algorithm_specific = bool(int(FLAGS.algorithm_specific))
    
-   for sub_folder in os.listdir(target_dir):
+   if not algorithmic_specific:
+   
+      for sub_folder in os.listdir(target_dir):
        
-       exp_path = os.path.join(target_dir, sub_folder)
+          exp_path = os.path.join(target_dir, sub_folder)
     
-       if os.path.isdir(exp_path) and regressor_name in sub_folder:
+          if os.path.isdir(exp_path) and regressor_name in sub_folder:
           
-          all_target_dirs.append(exp_path)
+             all_target_dirs.append(exp_path)
+             
+   else:
+       
+     all_target_dirs.append(target_dir)
           
 elif include_paths_with != None:
    

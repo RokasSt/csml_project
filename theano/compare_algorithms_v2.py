@@ -22,6 +22,7 @@ import timeit
 import os
 from matplotlib import pyplot as plt
 import plot_utils
+import copy
 
 print("Importing data:")
 mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
@@ -373,7 +374,7 @@ def compare_algorithms(params ={'num_runs': 2,#20,
         
         for tag in exps.keys():
     
-            loc_params = dict(exps[tag])
+            loc_params = copy.deepcopy(exps[tag])
             
             m_name = loc_params['algorithm']
     
@@ -383,10 +384,12 @@ def compare_algorithms(params ={'num_runs': 2,#20,
            
                get_vals = exps[tag]['algorithm_dict'][loc_params['regressor']]
                
+               print(exps[tag]['algorithm_dict'])
+               
                print(get_vals)
                
-               for val_ind in get_vals:
-               
+               for val in get_vals:
+                   
                    reconst_dict = None
                
                    w_norms_all = None

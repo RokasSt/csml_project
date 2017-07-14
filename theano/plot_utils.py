@@ -830,10 +830,20 @@ def plot_temporal_data(list_target_dirs,
            
            assert regressor_val != None
            
+           if not isinstance(regressor_val, list):
+               
+              all_reg_values = []
+               
+              all_reg_values.append(regressor_val)
+              
+           else:
+               
+              all_reg_values = regressor_val
+           
         else:
            print("Regressor is not specified")
-           regressor_val = None
-                   
+           all_reg_values = [None]
+        
         for sub_folder in os.listdir(target_dir):
     
             selected_path = os.path.join(target_dir, sub_folder)
@@ -855,19 +865,27 @@ def plot_temporal_data(list_target_dirs,
                       for field in target_dict.keys():
                           
                           if field in sub_item:
+                             
+                             for reg_val in all_reg_values:
+                                 
+                                 if str(reg_val) in sub_item or\
+                                 len(all_reg_values) ==1:
                               
-                             check_file = os.path.join(check_path, 
-                                                       target_dict[field])
+                                    check_file =\
+                                    os.path.join(check_path, target_dict[field])
                    
-                             all_records = add_data(target_path = check_file, 
-                                                    look_at_dict= all_records,
-                                                    target_field = field,
-                                                    param_value = regressor_val,
-                                                    avg_axis = average_over_axis)
+                                    all_records = \
+                                    add_data(target_path = check_file, 
+                                             look_at_dict= all_records,
+                                             target_field = field,
+                                             param_value = reg_val,
+                                             avg_axis = average_over_axis)
+                                    break
+                                     
                              ### break inner for loop once field found                       
                              break
         
-        if len(list_target_dirs) == 1 and regressor_val == None:
+        if len(list_target_dirs) == 1 and (not isinstance(regressor, str)):
             
            if error_bars:
             
@@ -893,7 +911,7 @@ def plot_temporal_data(list_target_dirs,
                           save_to_path = save_plot_path,
                           std_dict     = all_records_std)
            
-    if len(list_target_dirs) > 1 and regressor_val != None:
+    if len(list_target_dirs) > 1 and isinstance(regressor, str):
         
        if error_bars:
           all_records_std = {}
