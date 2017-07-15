@@ -107,7 +107,7 @@ def compare_algorithms(params ={'num_runs': 20,
                        np_rand_gen = np.random.RandomState(1234)):
     
     """ master function to compare different algorithms """
-                       
+    
     assert params['N_train']  == 55000
 
     assert params['D'] == 784
@@ -602,9 +602,9 @@ if __name__ == "__main__":
             'learn_biases': False,
             'num_reconst_iters' :10,
             'num_to_reconstruct':10,
-            'pflip': 0.1},
+            'pflip': 0.1}
    
-   compare_algorithms(params_params
+   compare_algorithms(params = params,
                       exps = exps,
                       experiment_id = "ALPHA_RI10_NR40")
    

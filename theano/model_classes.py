@@ -295,19 +295,19 @@ class BoltzmannMachine(object):
         
            self.sample_set      = T.ivector('sample_set')
            
-           if (("CD" in self.algorithm) or ("PCD" in self.algorithm))\
-           and self.num_hidden ==0:
+           if "CD" in self.algorithm and self.num_hidden ==0:
            
               self.x_gibbs= theano.shared(np.ones([self.batch_size,self.num_vars],
                                           dtype=theano.config.floatX),
                                           borrow = True, name= "x_gibbs")
                                           
-           if "PCD" in self.algorithm and self.num_hidden > 0:
+           if "CD" in self.algorithm and self.num_hidden > 0:
               
-              self.x_gibbs_rbm =\
-               theano.shared(np.ones([self.batch_size,self.num_hidden],
-                                     dtype=theano.config.floatX),
-                                     borrow = True, name= "persistent_gibbs")
+              self.persistent_gibbs =\
+              theano.shared(np.ones([self.batch_size,self.num_hidden],
+                            dtype=theano.config.floatX),
+                            borrow = True, 
+                            name= "persistent_gibbs")
               
            if "CSS" in self.algorithm and self.use_is != True:
               
@@ -321,9 +321,11 @@ class BoltzmannMachine(object):
                                                 
               if self.num_hidden > 0:
                 
-                 init_mf_hid = self.np_rand_gen.uniform(0, 1, size =(self.num_hidden,1))
+                 init_mf_hid = \
+                 self.np_rand_gen.uniform(0, 1, size =(self.num_hidden,1))
               
-                 init_mf_hid = np.asarray(init_mf_hid, dtype = theano.config.floatX)
+                 init_mf_hid = np.asarray(init_mf_hid, 
+                                          dtype = theano.config.floatX)
               
                  self.mf_hid_params = theano.shared(init_mf_hid, 
                                                     name= "mf_hid_params", 
@@ -877,8 +879,7 @@ class BoltzmannMachine(object):
               
            normalizer_term = self.add_css_approximation(data_term)
                
-        if (("CD" in self.algorithm) or ("PCD" in self.algorithm))\
-         and self.num_hidden ==0:
+        if "CD" in self.algorithm and self.num_hidden ==0:
             
            data_term = self.compute_energy(self.x, self.batch_size)
            
@@ -887,8 +888,7 @@ class BoltzmannMachine(object):
            
            normalizer_term = -T.mean(normalizer_term)
            
-        if (("PCD" in self.algorithm) or ("CD" in self.algorithm))\
-         and self.num_hidden > 0:
+        if "CD" in self.algorithm and self.num_hidden > 0:
            
            data_term = self.compute_free_energy(self.x)
             
@@ -912,9 +912,9 @@ class BoltzmannMachine(object):
            
            if "PCD" in self.algorithm:
               
-              init_chain  = self.x_gibbs_rbm
+              init_chain  = self.persistent_gibbs
                
-           if "CD" in self.algorithm:
+           else:
             
               # positive phase
               _, _, hid_sample = self.get_h_given_v_samples(self.x)
@@ -947,18 +947,18 @@ class BoltzmannMachine(object):
         """ function to obtain samples for CD or PCD approxmation
         for training fully visible Boltzmann Machine"""
         
-        if "CD" in self.algorithm:
-            
-           input_vars = [self.minibatch_set]
-           
-           given_vars = {self.x_gibbs: self.train_inputs[self.minibatch_set,:]}
-           
         if "PCD" in self.algorithm:
             
            input_vars = []
            
            given_vars = []
-        
+           
+        else:
+           
+           input_vars = [self.minibatch_set]
+           
+           given_vars = {self.x_gibbs: self.train_inputs[self.minibatch_set,:]} 
+           
         get_samples = theano.function(inputs  = input_vars,
                                       outputs = [self.p_xi_given_x_[-1], 
                                                  self.gibbs_samples[-1]
@@ -1015,7 +1015,7 @@ class BoltzmannMachine(object):
                
         if ("PCD" in self.algorithm) and self.num_hidden > 0:
            
-           self.updates[self.x_gibbs_rbm] = self.hid_samples
+           self.updates[self.persistent_gibbs] = self.hid_samples
            
     def select_data(self, minibatch_set):
         
@@ -1132,7 +1132,7 @@ class BoltzmannMachine(object):
            
               var_list = [self.minibatch_set] 
               
-        if ("CD" in self.algorithm) or ("PCD" in self.algorithm):
+        if "CD" in self.algorithm:
             
            input_dict = {
             self.x  : self.train_inputs[self.minibatch_set,:],
@@ -1239,7 +1239,7 @@ class BoltzmannMachine(object):
         
         self.cd_sampling = None
         
-        if "CD" in self.algorithm or "PCD" in self.algorithm:
+        if "CD" in self.algorithm:
 
            self.add_cd_samples()
            
@@ -1740,20 +1740,20 @@ class BoltzmannMachine(object):
                       approx_cost, p_tilda = self.optimize(list(minibatch_inds),
                                                            lrate_epoch) 
             
-                if ("CD" in self.algorithm) or ("PCD" in self.algorithm):
+                if "CD" in self.algorithm:
            
                    if self.num_hidden ==0:
-            
-                      if "CD" in self.algorithm:
-                          
-                         mf_sample, cd_sample =\
-                          self.cd_sampling(list(minibatch_inds))
-           
-                         self.x_gibbs.set_value(np.transpose(cd_sample))
                         
                       if "PCD" in self.algorithm:
                           
                          mf_sample, cd_sample = self.cd_sampling()
+           
+                         self.x_gibbs.set_value(np.transpose(cd_sample))
+                         
+                      else:
+                         ### "CD" 
+                         mf_sample, cd_sample =\
+                          self.cd_sampling(list(minibatch_inds))
            
                          self.x_gibbs.set_value(np.transpose(cd_sample))
                          
