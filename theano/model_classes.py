@@ -295,21 +295,21 @@ class BoltzmannMachine(object):
         
            self.sample_set      = T.ivector('sample_set')
            
-           if (self.algorithm == "CD" or self.algorithm=="PCD")\
-            and self.num_hidden ==0:
+           if (("CD" in self.algorithm) or ("PCD" in self.algorithm))\
+           and self.num_hidden ==0:
            
               self.x_gibbs= theano.shared(np.ones([self.batch_size,self.num_vars],
                                           dtype=theano.config.floatX),
                                           borrow = True, name= "x_gibbs")
                                           
-           if self.algorithm =="PCD" and self.num_hidden > 0:
+           if "PCD" in self.algorithm and self.num_hidden > 0:
               
               self.x_gibbs_rbm =\
                theano.shared(np.ones([self.batch_size,self.num_hidden],
                                      dtype=theano.config.floatX),
                                      borrow = True, name= "persistent_gibbs")
               
-           if self.algorithm == "CSS" and self.use_is  != True:
+           if "CSS" in self.algorithm and self.use_is != True:
               
               init_mf_vis = self.np_rand_gen.uniform(0, 1, size =(self.num_vars,1))
               
@@ -865,7 +865,7 @@ class BoltzmannMachine(object):
         
         """ function to add model objective for model optimization """ 
         
-        if self.algorithm =="CSS":
+        if "CSS" in self.algorithm:
             
            if self.num_hidden == 0:
             
@@ -877,7 +877,7 @@ class BoltzmannMachine(object):
               
            normalizer_term = self.add_css_approximation(data_term)
                
-        if (self.algorithm =="CD" or self.algorithm =="PCD")\
+        if (("CD" in self.algorithm) or ("PCD" in self.algorithm))\
          and self.num_hidden ==0:
             
            data_term = self.compute_energy(self.x, self.batch_size)
@@ -887,7 +887,7 @@ class BoltzmannMachine(object):
            
            normalizer_term = -T.mean(normalizer_term)
            
-        if (self.algorithm =="PCD" or self.algorithm == "CD")\
+        if (("PCD" in self.algorithm) or ("CD" in self.algorithm))\
          and self.num_hidden > 0:
            
            data_term = self.compute_free_energy(self.x)
@@ -910,11 +910,11 @@ class BoltzmannMachine(object):
            
         if self.num_hidden > 0:
            
-           if self.algorithm == "PCD":
+           if "PCD" in self.algorithm:
               
               init_chain  = self.x_gibbs_rbm
                
-           if self.algorithm == "CD":
+           if "CD" in self.algorithm:
             
               # positive phase
               _, _, hid_sample = self.get_h_given_v_samples(self.x)
@@ -947,13 +947,13 @@ class BoltzmannMachine(object):
         """ function to obtain samples for CD or PCD approxmation
         for training fully visible Boltzmann Machine"""
         
-        if self.algorithm == "CD":
+        if "CD" in self.algorithm:
             
            input_vars = [self.minibatch_set]
            
            given_vars = {self.x_gibbs: self.train_inputs[self.minibatch_set,:]}
            
-        if self.algorithm == "PCD":
+        if "PCD" in self.algorithm:
             
            input_vars = []
            
@@ -1013,7 +1013,7 @@ class BoltzmannMachine(object):
                   self.updates[target_param] = target_param -\
                   T.cast(self.learning_rate, dtype = theano.config.floatX)*grad
                
-        if self.algorithm =="PCD" and self.num_hidden > 0:
+        if ("PCD" in self.algorithm) and self.num_hidden > 0:
            
            self.updates[self.x_gibbs_rbm] = self.hid_samples
            
@@ -1132,7 +1132,7 @@ class BoltzmannMachine(object):
            
               var_list = [self.minibatch_set] 
               
-        if self.algorithm =="CD" or self.algorithm == "PCD":
+        if ("CD" in self.algorithm) or ("PCD" in self.algorithm):
             
            input_dict = {
             self.x  : self.train_inputs[self.minibatch_set,:],
@@ -1239,7 +1239,7 @@ class BoltzmannMachine(object):
         
         self.cd_sampling = None
         
-        if self.algorithm == "CD" or self.algorithm == "PCD":
+        if "CD" in self.algorithm or "PCD" in self.algorithm:
 
            self.add_cd_samples()
            
@@ -1247,7 +1247,7 @@ class BoltzmannMachine(object):
               
               self.cd_sampling = self.get_cd_samples()
            
-        if self.algorithm == "CSS" and self.mf_steps > 0: 
+        if "CSS" in self.algorithm and self.mf_steps > 0: 
         
            self.add_mf_updates()
            
@@ -1740,18 +1740,18 @@ class BoltzmannMachine(object):
                       approx_cost, p_tilda = self.optimize(list(minibatch_inds),
                                                            lrate_epoch) 
             
-                if self.algorithm =="CD" or self.algorithm == "PCD":
+                if ("CD" in self.algorithm) or ("PCD" in self.algorithm):
            
                    if self.num_hidden ==0:
             
-                      if self.algorithm == "CD":
+                      if "CD" in self.algorithm:
                           
                          mf_sample, cd_sample =\
                           self.cd_sampling(list(minibatch_inds))
            
                          self.x_gibbs.set_value(np.transpose(cd_sample))
                         
-                      if self.algorithm == "PCD":
+                      if "PCD" in self.algorithm:
                           
                          mf_sample, cd_sample = self.cd_sampling()
            

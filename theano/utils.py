@@ -188,6 +188,35 @@ def get_means_and_stds(target_dict):
                       
     return target_dict, std_dict
     
+def tile_the_lists(dict_lists, num_reg_values):
+    
+    """ function to tile the lists for consistency in plots;
+    assumes at least two dictionary levels before lists are found"""
+    
+    for f1 in dict_lists.keys():
+        
+        if isinstance(dict_lists[f1], dict):
+            
+           for f2 in dict_lists[f1].keys():
+               
+               if isinstance(dict_lists[f1][f2], dict):
+                   
+                  for f3 in dict_lists[f1][f2].keys():
+                      
+                      if isinstance(dict_lists[f1][f2][f3], list):
+                          
+                         if len(dict_lists[f1][f2][f3]) == 1:
+                             
+                           dict_lists[f1][f2][f3] =\
+                           num_reg_values*dict_lists[f1][f2][f3]
+      
+               elif isinstance(dict_lists[f1][f2], list):
+                   
+                    if len(dict_lists[f1][f2]) == 1:
+                       dict_lists[f1][f2] = num_reg_values*dict_lists[f1][f2]
+                   
+    return dict_lists              
+########################################################################
 if __name__ == "__main__":
     
     ### this block is for testing functions

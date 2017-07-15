@@ -105,16 +105,16 @@ if __name__ == "__main__":
       print("Will generate plots of w norms averaged over multiple runs")
       plot_utils.plot_temporal_data(list_target_dirs = all_target_dirs,
                                     target_dict = {"CSS":"W_NORMS.dat",
-                                                   "PCD":"W_NORMS.dat",
-                                                   "CD": "W_NORMS.dat",
+                                                   "PCD1":"W_NORMS.dat",
+                                                   "CD1": "W_NORMS.dat",
                                                    },
                                     xlabel_dict = {"CSS":'Iteration number',
-                                                   "PCD":'Iteration number',
-                                                   "CD":'Iteration number',
+                                                   "PCD1":'Iteration number',
+                                                   "CD1":'Iteration number',
                                                    },
                                     ylabel_dict = {"CSS":'L2-norm on W',
-                                                   "PCD":'L2-norm on W',
-                                                   "CD" :'L2-norm on W',
+                                                   "PCD1":'L2-norm on W',
+                                                   "CD1" :'L2-norm on W',
                                                    },
                                     file_name        = "MEAN_W_NORMS",
                                     param_dict_name  = "PARAMETERS.json",
@@ -127,28 +127,28 @@ if __name__ == "__main__":
       print("Will generate plots of reconstruction errors")
       
       plot_utils.plot_recon_errors(list_target_dirs = all_target_dirs,
-                                   list_experiments = ["CSS", "PCD", "CD"],
+                                   list_experiments = ["CSS", "PCD1", "CD1"],
                                    param_dict_name  = "PARAMETERS.json",
                                    regressor        = regressor_name,
                                    algorithm_spec   = algorithm_specific,
                                    error_bars       = True)
                         
    if avg_p_tilda:
-      print("Will generate plots of p tilda values over training time"+\
+      print("Will generate plots of p tilda values during training time"+\
       " averaged over training points")
       
       plot_utils.plot_temporal_data(list_target_dirs = all_target_dirs,
                                     target_dict = {"CSS":"TRAIN_P_TILDA.dat",
-                                                   "PCD":"TRAIN_PSEUDO_LOSSES.dat",
-                                                   "CD" :"TRAIN_PSEUDO_LOSSES.dat",
+                                                   "PCD1":"TRAIN_PSEUDO_LOSSES.dat",
+                                                   "CD1" :"TRAIN_PSEUDO_LOSSES.dat",
                                                    },
                                     xlabel_dict = {"CSS":'Iteration number',
-                                                   "PCD":'Iteration number',
-                                                   "CD" :'Iteration number',
+                                                   "PCD1":'Iteration number',
+                                                   "CD1" :'Iteration number',
                                                    },
                                     ylabel_dict = {"CSS":'P tilda',
-                                                   "PCD":'Pseudo Likelihood',
-                                                   "CD" :'Pseudo Likelihood',
+                                                   "PCD1":'Pseudo Likelihood',
+                                                   "CD1" :'Pseudo Likelihood',
                                                    },
                                     file_name        = "LEARNING_CURVES",
                                     param_dict_name  = "PARAMETERS.json",

@@ -86,14 +86,14 @@ def compare_algorithms(params ={'num_runs': 20,
                                         },
                                'report_p_tilda': True,
                                'regressor':None},
-                       'exp2':{'algorithm'     : 'CD',
+                       'exp2':{'algorithm'     : 'CD1',
                                'algorithm_dict':
                                    {
                                         'num_cd_steps':1,
                                     },
                                'report_p_tilda': False,
                                'regressor': None},
-                       'exp3':{'algorithm'     : 'PCD',
+                       'exp3':{'algorithm'     : 'PCD1',
                                'algorithm_dict':
                                    {
                                         'num_cd_steps':1,
@@ -526,13 +526,13 @@ def compare_algorithms(params ={'num_runs': 20,
                                   
     avg_errors, std_errors = utils.get_means_and_stds(target_dict = avg_errors)
     
-    file_to_open = os.path.join(root_path,'MEAN_RECON_ERRORS.json')
+    file_to_open = os.path.join(root_path, 'MEAN_RECON_ERRORS.json')
                                   
     with open(file_to_open, 'w') as json_file:
     
          json.dump(avg_errors, json_file)
          
-    file_to_open = os.path.join(root_path,'STD_RECON_ERRORS.json') 
+    file_to_open = os.path.join(root_path, 'STD_RECON_ERRORS.json') 
       
     with open(file_to_open, 'w') as json_file:
     
@@ -559,19 +559,19 @@ if __name__ == "__main__":
                            'num_samples'   : 100,
                            'resample'      : False,  
                            'use_is'        : True,
-                           'alpha': [0.5, 0.7, 0.3, 0.0, 0.995],
+                           'alpha': [0.5, 0.7, 0.3, 0.0, 0.1, 0.9, 0.995],
                            'mf_steps'      : 0
                            },
                   'report_p_tilda': True,
                   'regressor': 'alpha'},
-          'exp2':{'algorithm'     : 'CD',
+          'exp2':{'algorithm'     : 'CD1',
                   'algorithm_dict':
                     {
                       'num_cd_steps':1,
                      },
                   'report_p_tilda': False,
                   'regressor': None},
-          'exp3':{'algorithm': 'PCD',
+          'exp3':{'algorithm': 'PCD1',
                   'algorithm_dict':
                     {
                         'num_cd_steps':1,
@@ -579,9 +579,34 @@ if __name__ == "__main__":
                   'report_p_tilda': False,
                   'regressor':None}
                        }
+                       
+   params ={'num_runs': 40,
+            'N_train' : all_train_images.shape[0],
+            'D': all_train_images.shape[1],
+            'use_gpu': False,
+            'num_epochs': 1500,
+            'report_step':1,
+            'save_every_epoch': False,
+            'report_w_norm': True,
+            'save_init_weights':True,
+            'report_pseudo_cost':True,
+            'learning_rate':0.01,
+            'batch_size':10,
+            'use_momentum':True,
+            'momentum':0.95,
+            'num_hidden':0,
+            'num_to_learn':10,
+            'equal_per_classes':True,
+            'init_type'   :'ZEROS', # 'XAV' or 'NORM'
+            'zero_diag'   : False,
+            'learn_biases': False,
+            'num_reconst_iters' :10,
+            'num_to_reconstruct':10,
+            'pflip': 0.1},
    
-   compare_algorithms(exps = exps,
-                      experiment_id = "ALPHA_LIST")
+   compare_algorithms(params_params
+                      exps = exps,
+                      experiment_id = "ALPHA_RI10_NR40")
    
    
 

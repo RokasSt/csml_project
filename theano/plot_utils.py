@@ -513,6 +513,7 @@ def process_err_dict(means_dict,
        
     else:
        ## initialize update_dict if it is empty 
+       regressor_values = []
        if update_dict.keys() == []:
               
           update_dict['NOISY']   = {}
@@ -534,24 +535,64 @@ def process_err_dict(means_dict,
               update_dict['MISSING'][alg]['STD']  = []
               
        for alg in means_dict.keys():   
-               
-           mean_val = means_dict[alg]['MISSING']
-              
-           update_dict['MISSING'][alg]['MEANS'].append(mean_val)
-          
-           std_val = std_dict[alg]['MISSING']
-          
-           update_dict['MISSING'][alg]['STD'].append(std_val)
-          
-           mean_val = means_dict[alg]['NOISY']
-              
-           update_dict['NOISY'][alg]['MEANS'].append(mean_val)
-          
-           std_val = std_dict[alg]['NOISY']
-          
-           update_dict['NOISY'][alg]['STD'].append(std_val)
            
-       return update_dict  
+           if not isinstance(means_dict[alg]['MISSING'], dict):
+               
+              mean_val = means_dict[alg]['MISSING']
+              
+              update_dict['MISSING'][alg]['MEANS'].append(mean_val)
+          
+              std_val = std_dict[alg]['MISSING']
+          
+              update_dict['MISSING'][alg]['STD'].append(std_val)
+              
+           else:
+               
+              for field in means_dict[alg]['MISSING'].keys():
+                  
+                  val = float(field.split(" ")[1])
+                  
+                  mean_val = means_dict[alg]['MISSING'][field]
+                  
+                  update_dict['MISSING'][alg]['MEANS'].append(mean_val)
+          
+                  std_val = std_dict[alg]['MISSING'][field]
+          
+                  update_dict['MISSING'][alg]['STD'].append(std_val)
+                  
+                  regressor_values.append(val)
+              
+           if not isinstance(means_dict[alg]['NOISY'], dict):
+          
+              mean_val = means_dict[alg]['NOISY']
+              
+              update_dict['NOISY'][alg]['MEANS'].append(mean_val)
+          
+              std_val = std_dict[alg]['NOISY']
+          
+              update_dict['NOISY'][alg]['STD'].append(std_val)
+              
+           else:
+               
+              tmp_values = [] 
+               
+              for field in means_dict[alg]['NOISY'].keys():
+                  
+                  val = float(field.split(" ")[1])
+                  
+                  mean_val = means_dict[alg]['NOISY'][field]
+                  
+                  update_dict['NOISY'][alg]['MEANS'].append(mean_val)
+          
+                  std_val = std_dict[alg]['NOISY'][field]
+          
+                  update_dict['NOISY'][alg]['STD'].append(std_val)
+                  
+                  tmp_values.append(val)
+              
+              assert tmp_values == regressor_values
+           
+       return update_dict, regressor_values
 #######################################################################
 def generate_bar_plots(array_dict, 
                        num_exps, 
@@ -861,9 +902,9 @@ def plot_temporal_data(list_target_dirs,
                    if os.path.isdir(check_path):
                        
                       for field in target_dict.keys():
-                          print(field)
+                          
                           if field in sub_item:
-                             print("%s is in %s"%(field, sub_item))
+                             
                              found_regressor = False
                              for reg_val in all_reg_values:
                                  
@@ -873,7 +914,7 @@ def plot_temporal_data(list_target_dirs,
                                     check_file =\
                                     os.path.join(check_path, 
                                                  target_dict[field])
-                                    print("Processing %s"%check_file)
+                                    
                                     all_records = \
                                     add_data(target_path = check_file, 
                                              look_at_dict= all_records,
@@ -885,9 +926,11 @@ def plot_temporal_data(list_target_dirs,
                                     break
                              if not found_regressor:
                                 for reg_val in all_reg_values:
+                                    
                                     check_file =\
-                                    os.path.join(check_path, target_dict[field])
-                                    print("Processing %s"%check_file)
+                                    os.path.join(check_path, 
+                                                 target_dict[field])
+                                                 
                                     all_records = \
                                     add_data(target_path = check_file, 
                                              look_at_dict= all_records,
@@ -918,8 +961,7 @@ def plot_temporal_data(list_target_dirs,
                all_records[field] = np.mean(all_records[field], axis =0)
                
            save_plot_path = os.path.join(target_dir, "%s.jpeg"%file_name)
-           print(save_plot_path)
-           sys.exit()
+           
            plot_sequences(means_dict   = all_records, 
                           xlabel_dict  = xlabel_dict,
                           ylabel_dict  = ylabel_dict,
@@ -948,7 +990,7 @@ def plot_temporal_data(list_target_dirs,
                    np.mean(all_records[algorithm][x], axis =0)
                
            root_dir = os.path.split(list_target_dirs[0])[0]
-           print("Printing target directory: %s"%target_dir)
+           
            save_plot_path = os.path.join(target_dir, 
                                      "%s_%s.jpeg"%(file_name,regressor))
        
@@ -962,14 +1004,15 @@ def plot_temporal_data(list_target_dirs,
            if end_values_dict != None:
                
               save_plot_path = os.path.join(target_dir, 
-                                        "END_%s_%s.jpeg"%(file_name,regressor))
+                                            "END_%s_%s.jpeg"%
+                                            (file_name,regressor))
               
               plot_end_values(means_dict   = all_records, 
-                          xlabel_dict  = xlabel_dict,
-                          ylabel_dict  = end_values_dict,
-                          save_to_path = save_plot_path, 
-                          param_name   = regressor, 
-                          std_dict     = all_records_std)
+                              xlabel_dict  = xlabel_dict,
+                              ylabel_dict  = end_values_dict,
+                              save_to_path = save_plot_path, 
+                              param_name   = regressor, 
+                              std_dict     = all_records_std)
     ####################################################################
     if len(list_target_dirs) > 1 and isinstance(regressor, str):
         
@@ -1025,7 +1068,7 @@ def plot_recon_errors(list_target_dirs,
                       algorithm_spec = None,
                       error_bars = False):
     
-    """ function to generate plots of w norms averaged over multiple runs"""
+    """ function to generate plots of reconstruction errors """
     
     num_runs = 0
     
@@ -1036,7 +1079,7 @@ def plot_recon_errors(list_target_dirs,
     for target_dir in list_target_dirs:
         print("Processing %s"%target_dir)
         if isinstance(regressor, str) and isinstance(algorithm_spec, bool):
-           regressor = regressor.lower() 
+           regressor = regressor.lower()
            print("Regressor is specified: %s"%regressor)
            path_to_params = os.path.join(target_dir, param_dict_name)
            
@@ -1046,7 +1089,9 @@ def plot_recon_errors(list_target_dirs,
            
            assert regressor_val != None
            
-           regressor_values.append(regressor_val)
+           if not isinstance(regressor_val, list):
+               
+              regressor_values.append(regressor_val)
            
         else:
            print("Regressor is not specified")
@@ -1090,20 +1135,33 @@ def plot_recon_errors(list_target_dirs,
                               save_to_path = save_to_path,
                               plot_std     = error_bars)
                                     
-        else:
+        else: 
             
-           dict_to_update = process_err_dict(means_dict,
-                                             std_dict,
-                                             dict_to_update,
-                                             bar_plots = False)
-                                                   
+           dict_to_update, found_reg_list =\
+           process_err_dict(means_dict,
+                            std_dict,
+                            dict_to_update,
+                            bar_plots = False)
+                            
+           if len(list_target_dirs) ==1  and (algorithm_spec == True):     
+               
+              regressor_values = found_reg_list
+              
+              dict_to_update = \
+              utils.tile_the_lists(dict_lists = dict_to_update,
+                                   num_reg_values = len(regressor_values))
+                              
     if regressor != None:
-        
-       root_dir    = os.path.split(list_target_dirs[0])[0]
        
-       save_plot_to = os.path.join(root_dir,
-                                  "RECON_ERRORS_%s.jpeg"%regressor)
-        
+       if len(list_target_dirs) > 1:
+          root_dir    = os.path.split(list_target_dirs[0])[0]
+          save_plot_to = os.path.join(root_dir,
+                                      "RECON_ERRORS_%s.jpeg"%regressor)
+                                      
+       elif len(list_target_dirs) ==1:
+          save_plot_to = os.path.join(list_target_dirs[0],
+                                      "RECON_ERRORS_%s.jpeg"%regressor)
+       
        plot_regressions(y_dict = dict_to_update,
                         x_values = regressor_values,
                         save_to_path = save_plot_to,
