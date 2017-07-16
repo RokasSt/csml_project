@@ -597,7 +597,7 @@ if __name__ == "__main__":
             'num_hidden':0,
             'num_to_learn':10,
             'equal_per_classes':True,
-            'init_type'   :'ZEROS', # 'XAV' or 'NORM'
+            'init_type'   :'XAV', # 'ZEROS', 'XAV, 'NORM'
             'zero_diag'   : False,
             'learn_biases': False,
             'num_reconst_iters' :10,
@@ -606,7 +606,7 @@ if __name__ == "__main__":
    
    compare_algorithms(params = params,
                       exps = exps,
-                      experiment_id = "ALPHA_RI10_NR40")
+                      experiment_id = "XAV_ALPHA_RI10_NR40")
    
    
 

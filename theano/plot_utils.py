@@ -9,6 +9,7 @@ Machine Learning
 import matplotlib
 matplotlib.use('agg',warn=False, force=True)
 from matplotlib import pyplot as plt
+from matplotlib import rc,rcParams
 import subprocess
 import os
 import sys
@@ -16,6 +17,11 @@ import json
 import argparse
 import numpy as np
 import utils
+
+rc('text', usetex=True)
+rc('axes', linewidth=2)
+rc('font', weight='bold')
+rcParams['text.latex.preamble'] = [r'\usepackage{sfmath} \boldmath']
 
 def make_raster_plots(images, 
                       num_samples, 
@@ -263,8 +269,6 @@ def plot_sequences(means_dict,
     
     for exp_tag in means_dict.keys():
         
-        ax[plot_index].set_title(exp_tag, size = 13) 
-        
         if not isinstance(means_dict[exp_tag], dict):
         
            max_val = np.max(means_dict[exp_tag])
@@ -279,11 +283,14 @@ def plot_sequences(means_dict,
         
               ax[plot_index].errorbar(iters,
                                       means_dict[exp_tag],
-                                      yerr= std_dict[exp_tag])
+                                      yerr= std_dict[exp_tag],
+                                      linewidth = 2)
                                    
            else:
             
-              ax[plot_index].plot(iters, means_dict[exp_tag])
+              ax[plot_index].plot(iters, 
+                                  means_dict[exp_tag],
+                                  linewidth = 2)
               
         else:
             
@@ -304,20 +311,31 @@ def plot_sequences(means_dict,
                   ax[plot_index].errorbar(iters,
                                           means_dict[exp_tag][x_val],
                                           yerr= std_dict[exp_tag][x_val],
-                                          label = "%s %s"%(param_name,str(x_val)))
+                                          label =r"\textbf{%s %s}"
+                                          %(param_name,str(x_val)),
+                                          linewidth = 2)
                                    
                else:
             
                   ax[plot_index].plot(iters, 
                                       means_dict[exp_tag][x_val],
-                                      label ="%s %s"%(param_name,str(x_val)))
+                                      label =r"\textbf{%s %s}"
+                                      %(param_name,str(x_val)),
+                                      linewidth = 2)
+                                      
+        ax[plot_index].set_title(r'\textbf{%s}'%exp_tag, size = 15)
         
-        ax[plot_index].set_xlabel(xlabel_dict[exp_tag])
+        ax[plot_index].set_xlabel(r'\textbf{%s}'%xlabel_dict[exp_tag], 
+                                  fontsize= 15)
     
-        ax[plot_index].set_ylabel(ylabel_dict[exp_tag])
+        ax[plot_index].set_ylabel(r'\textbf{%s}'%ylabel_dict[exp_tag], 
+                                  fontsize= 15)
         
         ax[plot_index].locator_params(nbins=8, axis='y')
         
+        ax[plot_index].yaxis.set_tick_params(labelsize = 14)
+        
+        ax[plot_index].xaxis.set_tick_params(labelsize = 14)
         ## alternative to using locat_params:
         #if min_val > 0:
            #ax[plot_index].yaxis.set_ticks(np.arange(0, max_val, max_val/5))
@@ -410,18 +428,25 @@ def plot_end_values(means_dict,
         if use_indexing:
            if y_axis_std != []:
            
-              ax[plot_index].errorbar(x_axis, y_axis, yerr  = y_axis_std)
+              ax[plot_index].errorbar(x_axis, 
+                                      y_axis, 
+                                      yerr  = y_axis_std,
+                                      linewidth = 2)
               
            else:
             
-              ax[plot_index].plot(x_axis, y_axis)
+              ax[plot_index].plot(x_axis, 
+                                  y_axis,
+                                  linewidth = 2)
                                
                                
-           ax[plot_index].set_title(exp_tag, size = 13)  
+           ax[plot_index].set_title(r'\textbf{%s}'%exp_tag, fontsize = 15)  
         
-           ax[plot_index].set_xlabel(param_name)
+           ax[plot_index].set_xlabel(r'\textbf{%s}'%param_name, 
+                                     fontsize =14)
     
-           ax[plot_index].set_ylabel(ylabel_dict[exp_tag])
+           ax[plot_index].set_ylabel(r'\textbf{%s}'%ylabel_dict[exp_tag],
+                                     fontsize = 14)
         
            ax[plot_index].locator_params(nbins=8, axis='y')
         
@@ -431,17 +456,20 @@ def plot_end_values(means_dict,
         
            if y_axis_std != []:
            
-              ax.errorbar(x_axis, y_axis, yerr  = y_axis_std)
+              ax.errorbar(x_axis, 
+                          y_axis, 
+                          yerr  = y_axis_std,
+                          linewidth = 2)
               
            else:
             
-              ax.plot(x_axis, y_axis)
+              ax.plot(x_axis, y_axis, linewidth =2)
                                
-           ax.set_title(exp_tag, size = 13)  
+           ax.set_title(r'\textbf{%s}'%exp_tag, size = 15)  
         
-           ax.set_xlabel(param_name)
+           ax.set_xlabel(r'\textbf{%s}'%param_name)
     
-           ax.set_ylabel(ylabel_dict[exp_tag])
+           ax.set_ylabel(r'\textbf{%s}'%ylabel_dict[exp_tag])
         
            ax.locator_params(nbins=8, axis='y')
            
@@ -699,28 +727,40 @@ def plot_regressions(y_dict,
                ax[plot_index].errorbar(x_values,
                                        y_values,
                                        yerr  = std_y_values,
-                                       label = "%s"%alg)
+                                       label = r"\textbf{%s}"%alg,
+                                       linewidth = 2)
             else:
             
                ax[plot_index].plot(x_values, 
                                    y_values,
-                                   label ="%s"%alg)
+                                   label =r"\textbf{%s}"%alg,
+                                   linewidth = 2)
         
-        ax[plot_index].set_xlabel(x_label)
+        ax[plot_index].set_xlabel(r'\textbf{%s}'%x_label, fontsize=15)
     
-        ax[plot_index].set_ylabel(y_label)
+        ax[plot_index].set_ylabel(r'\textbf{%s}'%y_label, fontsize =15)
         
         str_spec = exp_type.lower()
         
-        ax[plot_index].set_title('Reconstruction of %s pixels'%str_spec)
+        str_spec = str_spec[0].upper() + str_spec[1:]
         
-        #if min_val >= 0:
+        ax[plot_index].set_title(r'\textbf{%s pixels}'%str_spec, 
+                                 fontsize=15)
         
-         #  ax[plot_index].yaxis.set_ticks(np.arange(0, max_val+5, (max_val+5)//5))
+        if min_val >= 0:
+        
+           ax[plot_index].yaxis.set_ticks(np.arange(0, max_val+5, (max_val+5)//5))
            
-        #else:
+        else:
             
-        ax[plot_index].locator_params(nbins=8, axis='y')
+           ax[plot_index].locator_params(nbins=8, axis='y')
+        
+        ax[plot_index].yaxis.set_tick_params(labelsize = 14)
+        
+        ax[plot_index].xaxis.set_tick_params(labelsize = 14)
+        
+        ax[plot_index].set_xlim([x_values[0], 
+                                 x_values[-1]+0.05*x_values[-1]])
         
         plot_index +=1
         
