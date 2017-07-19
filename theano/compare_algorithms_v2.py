@@ -61,7 +61,8 @@ def compare_algorithms(params ={'num_runs': 20,
                                 'learn_biases': False,
                                 'num_reconst_iters' :5,
                                 'num_to_reconstruct':10,
-                                'pflip': 0.1},
+                                'pflip': 0.1,
+                                'pmiss': 0.5},
                        class_files = ["CLASS0.dat",
                                       "CLASS1.dat",
                                       "CLASS2.dat",
@@ -203,7 +204,7 @@ def compare_algorithms(params ={'num_runs': 20,
        np_rand_gen.normal(size = (params['D'], params['num_hidden']))
    
     elif params['num_hidden'] == 0 and params['init_type'] == "NORM":
-    
+            
        W0 = 0.00000001*\
        np_rand_gen.normal(size = (params['D'], params['D']))
    
@@ -364,8 +365,8 @@ def compare_algorithms(params ={'num_runs': 20,
         noisy_images = np.copy(imgs_to_reconstruct)
 
         noisy_images[which_noise_pixels] = 1- noisy_images[which_noise_pixels]
-
-        which_missing_pixels = utils.get_missing_pixels(gamma = 0.5, 
+        
+        which_missing_pixels = utils.get_missing_pixels(gamma = params['pmiss'], 
                                                         D= params['D'], 
                                                         N= params['num_to_learn'])
                                                    
@@ -556,14 +557,14 @@ if __name__ == "__main__":
                   'algorithm_dict':
                       {
                            'data_samples'  : False,
-                           'num_samples'   : 100,
+                           'num_samples'   : [10, 50, 100, 300, 500],
                            'resample'      : False,  
                            'use_is'        : True,
-                           'alpha': [0.5, 0.7, 0.3, 0.0, 0.1, 0.9, 0.995],
+                           'alpha': 0.7, #[0.5, 0.7, 0.3, 0.0, 0.1, 0.9, 0.995],
                            'mf_steps'      : 0
                            },
                   'report_p_tilda': True,
-                  'regressor': 'alpha'},
+                  'regressor': 'num_samples'},
           'exp2':{'algorithm'     : 'CD1',
                   'algorithm_dict':
                     {
@@ -602,11 +603,12 @@ if __name__ == "__main__":
             'learn_biases': False,
             'num_reconst_iters' :10,
             'num_to_reconstruct':10,
-            'pflip': 0.1}
+            'pflip': 0.1,
+            'pmiss': 0.5}
    
    compare_algorithms(params = params,
                       exps = exps,
-                      experiment_id = "XAV_ALPHA_RI10_NR40")
+                      experiment_id = "NS_XAV_ALPHA0.7_RI10_NR40")
    
    
 

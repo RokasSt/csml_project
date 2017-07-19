@@ -316,7 +316,7 @@ def plot_sequences(means_dict,
                                           linewidth = 2)
                                    
                else:
-            
+                  
                   ax[plot_index].plot(iters, 
                                       means_dict[exp_tag][x_val],
                                       label =r"\textbf{%s %s}"
@@ -523,7 +523,15 @@ def process_err_dict(means_dict,
               #### share the same set subfields
               for field in means_dict[alg]['MISSING'].keys():
                   
-                  output_dict['LABELS'].append("%s %s"%(alg,field))
+                  if "_" in field:
+                     split_field = field.split("_")
+                     get_val = split_field[1].split(" ")
+                     
+                     field_short=split_field[0][0].upper()+\
+                     split_field[1][0].upper()
+                     field_short += " %s"%get_val[1]
+                  
+                  output_dict['LABELS'].append("%s %s"%(alg,field_short))
                   
                   output_dict['MISSING']['MEANS'].append(\
                   means_dict[alg]['MISSING'][field])
@@ -917,7 +925,12 @@ def plot_temporal_data(list_target_dirs,
            else:
                
               all_reg_values = regressor_val
-           
+              
+           if "_" in regressor:
+               split_reg_name = regressor.split("_")
+               param_name = split_reg_name[0][0].upper()+\
+               split_reg_name[1][0].upper()
+               
         else:
            print("Regressor is not specified")
            all_reg_values = [None]
@@ -944,26 +957,30 @@ def plot_temporal_data(list_target_dirs,
                       for field in target_dict.keys():
                           
                           if field in sub_item:
-                             
+                             print(all_reg_values)
                              found_regressor = False
                              for reg_val in all_reg_values:
-                                 
+                                 print(sub_item)
                                  if str(reg_val) in sub_item or\
                                  len(all_reg_values) ==1:
-                              
+                                    print("Block tested")
+                                    print(reg_val)
                                     check_file =\
                                     os.path.join(check_path, 
                                                  target_dict[field])
-                                    
+                                    print(check_file)
+                                    print(field)
                                     all_records = \
                                     add_data(target_path = check_file, 
                                              look_at_dict= all_records,
                                              target_field = field,
                                              param_value = reg_val,
                                              avg_axis = average_over_axis)
-                                             
+                                    print(all_records)
                                     found_regressor = True
-                                    break
+                                 else:
+                                    print("Blocke tested else")
+                             sys.exit()
                              if not found_regressor:
                                 for reg_val in all_reg_values:
                                     
@@ -979,7 +996,7 @@ def plot_temporal_data(list_target_dirs,
                                              avg_axis = average_over_axis)
                                     
                              ### break inner for loop once field found                       
-                             break
+                             #break
                              
         ###################################################################
         if len(list_target_dirs) == 1 and (not isinstance(regressor, str)):
@@ -1016,12 +1033,12 @@ def plot_temporal_data(list_target_dirs,
               all_records_std = None    
               
            for algorithm in all_records.keys():
-           
+               print(algorithm)
                if error_bars:
                   all_records_std[algorithm] = {}
               
                for x in all_records[algorithm].keys():
-               
+                   print(x)
                    if error_bars:
                       all_records_std[algorithm][x] = \
                       np.std(all_records[algorithm][x], axis= 0)
@@ -1033,12 +1050,13 @@ def plot_temporal_data(list_target_dirs,
            
            save_plot_path = os.path.join(target_dir, 
                                      "%s_%s.jpeg"%(file_name,regressor))
-       
+           print(all_records['CSS'])
+           print(all_records['PCD1'])
            plot_sequences(means_dict   = all_records, 
                           xlabel_dict  = xlabel_dict,
                           ylabel_dict  = ylabel_dict,
                           save_to_path = save_plot_path,
-                          param_name   = regressor,
+                          param_name   = param_name,
                           std_dict     = all_records_std)
                           
            if end_values_dict != None:
@@ -1051,7 +1069,7 @@ def plot_temporal_data(list_target_dirs,
                               xlabel_dict  = xlabel_dict,
                               ylabel_dict  = end_values_dict,
                               save_to_path = save_plot_path, 
-                              param_name   = regressor, 
+                              param_name   = param_name, 
                               std_dict     = all_records_std)
     ####################################################################
     if len(list_target_dirs) > 1 and isinstance(regressor, str):
@@ -1086,7 +1104,7 @@ def plot_temporal_data(list_target_dirs,
                       xlabel_dict  = xlabel_dict,
                       ylabel_dict  = ylabel_dict,
                       save_to_path = save_plot_path,
-                      param_name   = regressor,
+                      param_name   = param_name,
                       std_dict     = all_records_std)
                       
        if end_values_dict != None:
@@ -1098,7 +1116,7 @@ def plot_temporal_data(list_target_dirs,
                           xlabel_dict  = xlabel_dict,
                           ylabel_dict  = end_values_dict,
                           save_to_path = save_plot_path, 
-                          param_name   = regressor, 
+                          param_name   = param_name, 
                           std_dict     = all_records_std)
 ########################################################################
 def plot_recon_errors(list_target_dirs,
@@ -1156,10 +1174,6 @@ def plot_recon_errors(list_target_dirs,
         assert means_dict != None
         assert std_dict   != None
         
-        num_algorithms = len(means_dict.keys())
-        
-        assert num_algorithms == len(std_dict.keys())
-        
         ### if no regressor is provided bar plots are regenerated 
         ### for each individual experiment
         if regressor == None:
@@ -1170,8 +1184,10 @@ def plot_recon_errors(list_target_dirs,
             
            save_to_path = os.path.join(target_dir ,"BAR_ERRORS.jpeg")
            
+           num_bars = len(dict_of_lists['LABELS'])
+           
            generate_bar_plots(array_dict   = dict_of_lists,
-                              num_exps     = num_algorithms,            
+                              num_exps     = num_bars,            
                               save_to_path = save_to_path,
                               plot_std     = error_bars)
                                     
@@ -1201,11 +1217,20 @@ def plot_recon_errors(list_target_dirs,
        elif len(list_target_dirs) ==1:
           save_plot_to = os.path.join(list_target_dirs[0],
                                       "RECON_ERRORS_%s.jpeg"%regressor)
-       
+                                      
+       if "_" in regressor:
+          split_reg_name = regressor.split("_")
+          x_label = split_reg_name[0][0].upper()+\
+          split_reg_name[1][0].upper()
+           
+       else:
+           
+          x_label = regressor
+          
        plot_regressions(y_dict = dict_to_update,
                         x_values = regressor_values,
                         save_to_path = save_plot_to,
-                        x_label  = regressor,
+                        x_label  = x_label,
                         y_label  = "Reconstruction Errors",
                         plot_std = error_bars)                                                       
 ########################################################################
