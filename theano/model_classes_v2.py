@@ -64,8 +64,6 @@ class BoltzmannMachine(object):
         
         self.num_cd_steps   = None
         
-        self.data_samples   = None
-        
         self.resample       = None
         
         self.mf_steps       = 0
@@ -94,23 +92,29 @@ class BoltzmannMachine(object):
                 
                   self.num_samples = algorithm_dict[param]
                
-               if param == "data_samples":
-                
-                  self.data_samples = algorithm_dict[param]
+               if param == "uniform_alpha":
+                   
+                  self.uniform_alpha = algorithm_dict[param]
+                  
+               if param == "uniform_with_mf":
+                   
+                  self.uniform_with_mf = algorithm_dict[param] 
+                  
+               if param == "mixture":
+                   
+                  self.mixture = algorithm_dict[param] 
                   
                if param == "alpha":
                    
                   alpha = algorithm_dict[param]  
                 
-                  if alpha != None:
+        if alpha != None and self.uniform_alpha:
                      
-                     self.is_probs= (1-alpha)*0.5*np.ones([1,self.num_vars])+\
-                                  alpha*np.mean(training_inputs,0)
+           self.is_probs= (1-alpha)*0.5*np.ones([1,self.num_vars])+\
+                          alpha*np.mean(training_inputs,0)
                                   
-                     self.is_probs = \
-                     np.asarray(self.is_probs, dtype = theano.config.floatX)
-                                                 
-        if self.is_probs != []:
+           self.is_probs = \
+           np.asarray(self.is_probs, dtype = theano.config.floatX)
            
            if self.resample:
                
@@ -529,28 +533,29 @@ class BoltzmannMachine(object):
         
         return approx_Z
         
+    def add_is_sampler(self):
+        
+        """ function add importance distribution """
+        
+        print("Will use importance sampling for Z approximation")
+        print("Will use mean-field sampling for Z approximation")
+        
     def add_complementary_term(self):
         
         """ function to add computations on approximating term of log Z
         This term does not involve training points explicitly."""
         
-        approx_Z_mf = None
+        approx_Z = 0
+        
+        non_data_samples = False
         
         if self.num_samples > 0:
             
            non_data_samples = True
            
-           if self.mf_steps ==0:
-               
-              print("Will use importance sampling for Z approximation")
+           self.add_is_sampler()
               
-              approx_Z = self.add_is_approximation()
-              
-           elif self.mf_steps >0:
-           
-              print("Will use mean-field sampling for Z approximation")
-              
-              approx_Z = self.add_mf_approximation()
+           approx_Z = self.add_is_approximation()
            
         return approx_Z, non_data_samples
         
@@ -603,20 +608,6 @@ class BoltzmannMachine(object):
            
            approx_Z = max_val + T.log(T.sum(T.exp(approx_Z -max_val)))
            
-        if (non_data_term == None) and (axis == 1):
-            
-           max_vals  = T.max(data_term, axis=1)
-
-           max_vals  = T.reshape(max_vals,[self.batch_size,1])
-           
-           max_vals_tiled  = T.tile(max_vals,(1,self.data_samples+1))
-           
-           approx_Z = data_term - max_vals_tiled
-        
-           approx_Z = max_vals + T.log(T.sum(T.exp(approx_Z), axis=1))
-           
-           approx_Z = T.mean(approx_Z)
-           
         return approx_Z
         
     def add_css_approximation(self, minibatch_evals):
@@ -631,82 +622,23 @@ class BoltzmannMachine(object):
         
         approx_Z, non_data_samples = self.add_complementary_term()
         
-        if self.data_samples == 0:
-            
-           print("Will use minibatch set only for data term in Z approximation")
-           
-           approx_Z_data = -minibatch_evals
-            
-        if self.data_samples == self.N_train:
-            
-           print("Will explicitly include all training points in Z approximation")
-           
-           if self.num_hidden == 0:
-           
-              approx_Z_data = -self.compute_energy(self.x_tilda, self.N_train)
-              
-           else:
-               
-              approx_Z_data = -self.compute_free_energy(self.x_tilda)
-           
-        if (self.data_samples < self.N_train) and (self.data_samples != 0):
-            
-           print("Will uniformly sample from training set for Z approximation")
-           
-           if self.num_hidden == 0:
-           
-              approx_Z_data = -self.compute_energy(self.x_tilda, 
-                                          self.batch_size*self.data_samples)
-                                          
-           else:
-               
-              approx_Z_data = -self.compute_free_energy(self.x_tilda)
-                                        
-           approx_Z_data = T.reshape(approx_Z_data, 
-                                     [self.batch_size, self.data_samples])
-           
-           approx_Z_data = approx_Z_data - T.log(self.data_samples)
-           
-           minibatch_evals = -T.reshape(minibatch_evals, [self.batch_size,1])
-           
-           approx_Z_data = T.concatenate([approx_Z_data, minibatch_evals], axis = 1)
-           
+        approx_Z_data = -minibatch_evals
+        
         if non_data_samples:
            
            if self.resample:
                
-              if (self.data_samples == self.N_train) or (self.data_samples ==0):
-            
-                 approx_Z_data = T.tile(approx_Z_data,(self.batch_size,1))
+              approx_Z_data = T.tile(approx_Z_data,(self.batch_size,1))
                  
-              approx_Z = self.compute_approx_log_Z(approx_Z_data, approx_Z, axis=1)
+              approx_Z = self.compute_approx_log_Z(approx_Z_data, 
+                                                   approx_Z, 
+                                                   axis=1)
               
            else:
               
-              if (self.data_samples  < self.N_train) and (self.data_samples != 0):
-                 
-                 approx_Z = T.tile(approx_Z,(self.batch_size,1))
-                 
-                 approx_Z = self.compute_approx_log_Z(approx_Z_data, approx_Z, axis=1)
-               
-              if (self.data_samples == self.N_train) or (self.data_samples == 0):
-                 
-                 approx_Z = self.compute_approx_log_Z(approx_Z_data, approx_Z)
-              
-        else:
-            
-           if self.data_samples == self.N_train:
-               
               approx_Z = self.compute_approx_log_Z(approx_Z_data, 
-                                                   non_data_term =None)
-              
-              
-           if (self.data_samples < self.N_train) and (self.data_samples !=0):
-               
-              approx_Z = self.compute_approx_log_Z(approx_Z_data,
-                                                   non_data_term = None,
-                                                   axis=1)
-           
+                                                   approx_Z)
+        
         return approx_Z
         
     def get_importance_evals(self, samples, params):
@@ -831,38 +763,6 @@ class BoltzmannMachine(object):
         for Restricted Boltzmann Machine."""
         
         return self.free_energy_function(x)
-        
-    def test_compute_energy(self):
-        
-        """ test compute_energy() """
-        
-        if self.data_samples < self.N_train:
-        
-           approx_Z_data = -self.compute_energy(self.x_tilda, 
-                                                self.batch_size*self.data_samples)
-                                             
-        if self.data_samples == self.N_train:
-            
-           approx_Z_data = -self.compute_energy(self.x_tilda, self.data_samples)
-                                             
-        input_dict = {self.x_tilda: self.train_inputs[self.sample_set,:]}
-                                             
-        test_function = theano.function(inputs  = [self.sample_set],
-                                        outputs = approx_Z_data,
-                                        givens  = input_dict)
-                                        
-        return test_function
-        
-    def test_add_complementary_term(self):
-        
-        """ test add_complementary_term() """
-        
-        approx_Z, _ = self.add_complementary_term()
-        
-        test_function = theano.function(inputs=[],
-                                        outputs=[approx_Z])
-                                        
-        return test_function
                                         
     def add_objective(self):
         
@@ -1017,43 +917,7 @@ class BoltzmannMachine(object):
         if ("PCD" in self.algorithm) and self.num_hidden > 0:
            
            self.updates[self.persistent_gibbs] = self.hid_samples
-           
-    def select_data(self, minibatch_set):
-        
-        """ function to select samples for css approximation
-        with uniform sampling
-         """
-        
-        minibatch_size = len(minibatch_set)
-        
-        assert minibatch_size == self.batch_size
-        
-        ##  compl_inds :: complementary set of training points
-        ##  for now, complementary set is computed jointly;
-        ##  uses naive approach, uniform sampling
-        
-        if self.data_samples < self.N_train:
-            
-           data_samples = []
-           
-           for i in range(minibatch_size):
-               
-               compl_inds = list(self.train_set - set([minibatch_set[i]]))
-            
-               s = np.random.choice(compl_inds,
-                                    self.data_samples, 
-                                    replace=False)
-        
-               data_samples.extend(list(s))
-        
-           assert len(data_samples) == self.data_samples*minibatch_size
-           
-        if self.data_samples == self.N_train:
-            
-           data_samples = list(self.train_set)
-        
-        return data_samples  
-        
+    
     def add_approximate_likelihoods(self):
         
         """ function to define approximate likelihoods (p_tilda) 
@@ -1107,32 +971,13 @@ class BoltzmannMachine(object):
         """
         
         if self.algorithm =="CSS":
-            
-           if self.data_samples > 0:
-            
-              input_dict = {
-               self.x      : self.train_inputs[self.minibatch_set,:],
-               self.x_tilda: self.train_inputs[self.sample_set,:]
-              }
            
-              var_list = [self.sample_set, self.minibatch_set]
-              
-           elif (self.data_samples == 0) and self.mf_steps ==0:
-               
-              input_dict = {
+           input_dict = {
                self.x      : self.train_inputs[self.minibatch_set,:]
-              }
+                        }
            
-              var_list = [self.x_tilda, self.minibatch_set]
-              
-           elif (self.data_samples ==0) and (self.mf_steps > 0):
-              
-              input_dict = {
-               self.x      : self.train_inputs[self.minibatch_set,:]
-              }
+           var_list = [self.x_tilda, self.minibatch_set]
            
-              var_list = [self.minibatch_set] 
-              
         if "CD" in self.algorithm:
             
            input_dict = {
@@ -1660,14 +1505,8 @@ class BoltzmannMachine(object):
                       mf_t1 = timeit.default_timer()
                       print("%d steps of MF updates took --- %f minutes"%
                       (self.mf_steps,(mf_t1 -mf_t0)/60.0))
-                      
-                   if self.data_samples > 0:
-               
-                      sampled_indices = bm.select_data(minibatch_inds)
-              
-                      sampling_var = sampled_indices
-                                               
-                   if self.data_samples ==0 and self.mf_steps==0:
+                   
+                   if self.mf_steps==0:
                
                       if self.resample and self.is_probs ==[]:
                  
@@ -1687,11 +1526,14 @@ class BoltzmannMachine(object):
                       elif (not self.resample) and self.is_probs != []:
                           
                          is_samples = self.np_rand_gen.binomial(n=1, p= self.is_probs, 
-                         size = (self.num_samples, self.num_vars)) 
+                         size = (self.num_samples, self.num_vars))
                          
-                      sampling_var = np.asarray(is_samples, 
-                                                dtype = theano.config.floatX)
-              
+                   elif self.mf_steps > 0:
+                       
+                      #TODO 
+                   
+                   sampling_var = np.asarray(is_samples, 
+                                             dtype = theano.config.floatX)
                    if test_gradients:
                       t0 = timeit.default_timer()
                       approx_cost, p_tilda = self.optimize(sampling_var, 
@@ -1774,8 +1616,8 @@ class BoltzmannMachine(object):
         
                    if i % report_step ==0:
             
-                      print('Training epoch %d ---- Iter %d ----'%(epoch_index, i)+\
-                      ' pseudo cost value: %f'%approx_cost)
+                      print('Training epoch %d ---- Iter %d ----'%
+                      (epoch_index, i)+' pseudo cost value: %f'%approx_cost)
            
                 if report_p_tilda:
                    

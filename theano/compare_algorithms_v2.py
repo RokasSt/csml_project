@@ -156,7 +156,7 @@ def compare_algorithms(params ={'num_runs': 20,
    
     import theano
     import theano.tensor as T
-    from   model_classes import BoltzmannMachine
+    from   model_classes_v2 import BoltzmannMachine
     from   train_utils import run_experiment
     ###### specify saving directory ####################################
     exp1_string = exps['exp1']['algorithm']
@@ -559,6 +559,9 @@ if __name__ == "__main__":
                            'num_samples'   : 100, #[10, 50, 100, 300, 500],
                            'resample'      : False,  
                            'alpha': None , #0.7, #[0.5, 0.7, 0.3, 0.0, 0.1, 0.9, 0.995],
+                           'uniform_alpha'  :True,
+                           'uniform_with_mf':  True
+                           'mixture': 
                            'mf_steps'      : 50,
                            },
                   'report_p_tilda': True,
@@ -606,7 +609,7 @@ if __name__ == "__main__":
    
    compare_algorithms(params = params,
                       exps = exps,
-                      experiment_id = "ZEROW_MF_NR1")
+                      experiment_id = "TEST_ZEROW_MF_NR1")
    
    
 
