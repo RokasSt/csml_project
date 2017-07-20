@@ -68,9 +68,7 @@ class BoltzmannMachine(object):
         
         self.resample       = None
         
-        self.mf_steps       = None
-        
-        self.use_is         = None
+        self.mf_steps       = 0
         
         self.is_probs       = []
         
@@ -91,10 +89,6 @@ class BoltzmannMachine(object):
                if param == "num_cd_steps":
                 
                   self.num_cd_steps = algorithm_dict[param]
-               
-               if param == "use_is":
-                
-                  self.use_is = algorithm_dict[param]
                
                if param == "num_samples":
                 
@@ -309,9 +303,11 @@ class BoltzmannMachine(object):
                             borrow = True, 
                             name= "persistent_gibbs")
               
-           if "CSS" in self.algorithm and self.use_is != True:
+           if "CSS" in self.algorithm and self.mf_steps  > 0:
               
-              init_mf_vis = self.np_rand_gen.uniform(0, 1, size =(self.num_vars,1))
+              init_mf_vis = self.np_rand_gen.uniform(0, 
+                                                     1, 
+                                                     size =(self.num_vars,1))
               
               init_mf_vis = np.asarray(init_mf_vis, dtype = theano.config.floatX)
               
@@ -540,13 +536,13 @@ class BoltzmannMachine(object):
             
            non_data_samples = True
            
-           if self.use_is:
+           if self.mf_steps ==0:
                
               print("Will use importance sampling for Z approximation")
               
               approx_Z = self.add_is_approximation()
               
-           else:
+           elif self.mf_steps >0:
            
               print("Will use mean-field sampling for Z approximation")
               
@@ -568,7 +564,7 @@ class BoltzmannMachine(object):
 
            max_vals = T.reshape(max_vals,[self.batch_size,1])
            
-           if self.use_is:
+           if self.mf_steps ==0:
               
               max_vals_tiled = T.tile(max_vals,
                                       (1,self.num_samples+self.batch_size))
@@ -662,13 +658,14 @@ class BoltzmannMachine(object):
                
               approx_Z_data = -self.compute_free_energy(self.x_tilda)
                                         
-           approx_Z_data = T.reshape(approx_Z_data, [self.batch_size, self.data_samples])
+           approx_Z_data = T.reshape(approx_Z_data, 
+                                     [self.batch_size, self.data_samples])
            
            approx_Z_data = approx_Z_data - T.log(self.data_samples)
            
            minibatch_evals = -T.reshape(minibatch_evals, [self.batch_size,1])
            
-           approx_Z_data = T.concatenate([approx_Z_data, minibatch_evals],axis = 1)
+           approx_Z_data = T.concatenate([approx_Z_data, minibatch_evals], axis = 1)
            
         if non_data_samples:
            
@@ -1116,7 +1113,7 @@ class BoltzmannMachine(object):
            
               var_list = [self.sample_set, self.minibatch_set]
               
-           elif (self.data_samples == 0) and self.use_is:
+           elif (self.data_samples == 0) and self.mf_steps ==0:
                
               input_dict = {
                self.x      : self.train_inputs[self.minibatch_set,:]
@@ -1124,7 +1121,7 @@ class BoltzmannMachine(object):
            
               var_list = [self.x_tilda, self.minibatch_set]
               
-           elif (self.data_samples ==0) and (not self.use_is):
+           elif (self.data_samples ==0) and (self.mf_steps > 0):
               
               input_dict = {
                self.x      : self.train_inputs[self.minibatch_set,:]
@@ -1352,11 +1349,11 @@ class BoltzmannMachine(object):
             
            minibatch_energies = -self.compute_free_energy(self.x)
            
-        if self.use_is and training:
+        if self.mf_steps ==0 and training:
         
            sample_energies = self.add_is_approximation()
            
-        elif (not self.use_is) and training:
+        elif (self.mf_steps > 0) and training:
             
            sample_energies = self.add_mf_approximation()
            
@@ -1491,7 +1488,7 @@ class BoltzmannMachine(object):
                                            noisy_images[xi,:],
                                            pflip)
             
-            Emax = E_model + E_noise
+            Emax    = E_model + E_noise
             
             for iter_ind in range(num_iters):
                 
@@ -1649,25 +1646,24 @@ class BoltzmannMachine(object):
             
                 if self.algorithm =="CSS":
                     
-                   if (self.num_samples > 0) and (self.use_is != True):
+                   if (self.num_samples > 0) and (self.mf_steps > 0):
                
-                      if self.mf_steps > 0:
-                         print("Updating MF parameters ...")
-                         mf_t0 = timeit.default_timer()
+                      print("Updating MF parameters ...")
+                      mf_t0 = timeit.default_timer()
               
-                         self.do_mf_updates(num_steps = self.mf_steps)
+                      self.do_mf_updates(num_steps = self.mf_steps)
               
-                         mf_t1 = timeit.default_timer()
-                         print("%d steps of MF updates took --- %f minutes"%
-                         (self.mf_steps,(mf_t1 -mf_t0)/60.0))
-               
+                      mf_t1 = timeit.default_timer()
+                      print("%d steps of MF updates took --- %f minutes"%
+                      (self.mf_steps,(mf_t1 -mf_t0)/60.0))
+                      
                    if self.data_samples > 0:
                
                       sampled_indices = bm.select_data(minibatch_inds)
               
                       sampling_var = sampled_indices
                                                
-                   if self.data_samples ==0 and self.use_is:
+                   if self.data_samples ==0 and self.mf_steps==0:
                
                       if self.resample and self.is_probs ==[]:
                  
@@ -1716,26 +1712,26 @@ class BoltzmannMachine(object):
                       print((np.round(b_implicit,12) == np.round(b_explicit,12)).all())
                       sys.exit()
            
-                   if self.use_momentum and self.use_is:
+                   if self.use_momentum and self.mf_steps ==0:
               
                       approx_cost, p_tilda = self.optimize(sampling_var, 
                                                   list(minibatch_inds),
                                                   lrate_epoch,
                                                   momentum_epoch)
               
-                   elif (not self.use_momentum) and self.use_is:
+                   elif (not self.use_momentum) and self.mf_steps ==0:
               
                       approx_cost, p_tilda = self.optimize(sampling_var, 
                                                   list(minibatch_inds),
                                                   lrate_epoch) 
                                               
-                   elif self.use_momentum and (not self.use_is):
+                   elif self.use_momentum and (self.mf_steps > 0):
                
                       approx_cost, p_tilda = self.optimize(list(minibatch_inds),
                                                            lrate_epoch,
                                                            momentum_epoch)
                                               
-                   elif (not self.use_momentum) and (not self.use_is):
+                   elif (not self.use_momentum) and (self.mf_steps > 0):
               
                       approx_cost, p_tilda = self.optimize(list(minibatch_inds),
                                                            lrate_epoch) 

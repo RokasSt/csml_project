@@ -17,7 +17,6 @@ class Experiments(object):
          'num_samples'  :   '100',
          'resample'     :   '0',  # '0' - do not resample for each minibatch point.
          'momentum'     :   '0',
-         'use_is'       :   '1',
          'algorithm'    :   'CSS',
          'num_hidden'   :   '0',
          'use_gpu'      :   '0', #'1'

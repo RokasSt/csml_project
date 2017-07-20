@@ -81,9 +81,8 @@ def compare_algorithms(params ={'num_runs': 20,
                                         'data_samples'  : False,
                                         'num_samples'   : 100,
                                         'resample'      : False,  
-                                        'use_is'        : True,
                                         'alpha' : 0.5, # 0.7 #0.3 # 0.0 # 0.995 
-                                        'mf_steps'      : 0
+                                        'mf_steps'      : 0,
                                         },
                                'report_p_tilda': True,
                                'regressor':None},
@@ -557,14 +556,13 @@ if __name__ == "__main__":
                   'algorithm_dict':
                       {
                            'data_samples'  : False,
-                           'num_samples'   : [10, 50, 100, 300, 500],
+                           'num_samples'   : 100, #[10, 50, 100, 300, 500],
                            'resample'      : False,  
-                           'use_is'        : True,
-                           'alpha': 0.7, #[0.5, 0.7, 0.3, 0.0, 0.1, 0.9, 0.995],
-                           'mf_steps'      : 0
+                           'alpha': None , #0.7, #[0.5, 0.7, 0.3, 0.0, 0.1, 0.9, 0.995],
+                           'mf_steps'      : 50,
                            },
                   'report_p_tilda': True,
-                  'regressor': 'num_samples'},
+                  'regressor': None},
           'exp2':{'algorithm'     : 'CD1',
                   'algorithm_dict':
                     {
@@ -581,7 +579,7 @@ if __name__ == "__main__":
                   'regressor':None}
                        }
                        
-   params ={'num_runs': 40,
+   params ={'num_runs': 1, #40,
             'N_train' : all_train_images.shape[0],
             'D': all_train_images.shape[1],
             'use_gpu': False,
@@ -598,7 +596,7 @@ if __name__ == "__main__":
             'num_hidden':0,
             'num_to_learn':10,
             'equal_per_classes':True,
-            'init_type'   :'XAV', # 'ZEROS', 'XAV, 'NORM'
+            'init_type'   :'ZEROS', # 'ZEROS', 'XAV, 'NORM'
             'zero_diag'   : False,
             'learn_biases': False,
             'num_reconst_iters' :10,
@@ -608,7 +606,7 @@ if __name__ == "__main__":
    
    compare_algorithms(params = params,
                       exps = exps,
-                      experiment_id = "NS_XAV_ALPHA0.7_RI10_NR40")
+                      experiment_id = "ZEROW_MF_NR1")
    
    
 

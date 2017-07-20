@@ -80,8 +80,6 @@ arg_parser.add_argument('--data_samples', type = str, required = False)
 
 arg_parser.add_argument('--learn_subset', type = str, required = False)
 
-arg_parser.add_argument('--use_is', type = str, required = False)
-
 arg_parser.add_argument('--resample', type = str, required = False)
 
 arg_parser.add_argument('--momentum', type = str, required = False)
@@ -205,8 +203,6 @@ if algorithm == "CD" or algorithm == "PCD":
    
    algorithm_dict['resample']     = None
    
-   algorithm_dict['use_is']       = False
-   
    algorithm_dict['mf_steps']     = None
    
 report_p_tilda = False
@@ -225,6 +221,8 @@ if algorithm   == "CSS":
    
    algorithm_dict['alpha']  = 0.995
    
+   algorithm_dict['mf_steps'] = 0
+   
    if algorithm_dict['num_samples'] == 0:
    
       specs = (num_hidden,
@@ -239,19 +237,9 @@ if algorithm   == "CSS":
       
       algorithm_dict['resample'] = None
       
-      algorithm_dict['mf_steps'] = 0
-      
-   algorithm_dict['use_is'] = False
-      
    if algorithm_dict['num_samples'] > 0:
-       
-      if FLAGS.use_is != None:
-          
-         algorithm_dict['use_is']  = bool(int(FLAGS.use_is))
-         
-         algorithm_dict['mf_steps'] = 0
-       
-      elif FLAGS.mf_steps != None:
+      
+      FLAGS.mf_steps != None:
           
          algorithm_dict['mf_steps'] = int(FLAGS.mf_steps)
       
