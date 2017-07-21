@@ -7,7 +7,8 @@ Machine Learning
 """
 import numpy as np
 from plot_utils import plot_reconstructions
-from model_classes import BoltzmannMachine
+import model_classes as clv1
+import model_classes_v2  as clv2
 import os
 
 def run_experiment(glob_params, 
@@ -19,24 +20,34 @@ def run_experiment(glob_params,
                    blocked_images,
                    noisy_images,
                    exp_path,
+                   version = "v1",
                    collect_w_norms = None,
                    collect_reconst = None):
                             
     """ function to run a single training experiment """
-                           
-    bm = BoltzmannMachine(num_vars        = glob_params['D'], 
-                          num_hidden      = glob_params['num_hidden'],
-                          training_inputs = training_inputs,
-                          algorithm       = method_params['algorithm'],
-                          algorithm_dict  = method_params['algorithm_dict'],
-                          batch_size      = glob_params['batch_size'],
-                          use_momentum    = glob_params['use_momentum'],
-                          W0              = init_params['W0'], 
-                          b0              = init_params['b0'], 
-                          bhid0           = init_params['bhid0'],
-                          report_p_tilda  = method_params['report_p_tilda'],
-                          learn_biases    = glob_params['learn_biases'])
     
+    if version == "v1":
+        
+       cl =clv1
+       
+    elif version == "v2":
+    
+       cl = clv2
+                           
+    bm = cl.BoltzmannMachine(num_vars       = glob_params['D'], 
+                             num_hidden     = glob_params['num_hidden'],
+                             training_inputs= training_inputs,
+                             algorithm       = method_params['algorithm'],
+                             algorithm_dict  = method_params['algorithm_dict'],
+                             batch_size      = glob_params['batch_size'],
+                             use_momentum    = glob_params['use_momentum'],
+                             W0              = init_params['W0'], 
+                             b0              = init_params['b0'], 
+                             bhid0           = init_params['bhid0'],
+                             zero_diag       = glob_params['zero_diag'],
+                             report_p_tilda  = method_params['report_p_tilda'],
+                             learn_biases    = glob_params['learn_biases'])
+                                  
     bm.add_graph()
     
     p_tilda_all, losses, train_time, w_norms = \

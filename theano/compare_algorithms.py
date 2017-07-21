@@ -114,10 +114,6 @@ def compare_algorithms(params ={'num_runs': 20,
 
     assert params['report_step'] != None
 
-    params['normal_init']        = True
-
-    params['xavier_init']        = False
-    
     if params['equal_per_classes']:
     
        found_all_files = True

@@ -23,22 +23,26 @@ import os
 from matplotlib import pyplot as plt
 import plot_utils
 import copy
+import scipy.io
 
-print("Importing data:")
-mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+print("Importing data ...")
+mnist_data = scipy.io.loadmat("mnist-original")
 
-all_test_images      = np.round(mnist.test.images)
+all_train_images = np.round(np.transpose(mnist_data['data'])/255.0)
 
-all_test_labels      = mnist.test.labels
+print(all_train_images.shape)
 
-all_train_images     = np.round(mnist.train.images)
+num_classes = 10
+num_examples = mnist_data['label'].shape[1]
 
-all_train_labels     = mnist.train.labels
+all_train_labels = np.zeros([num_examples, num_classes])
 
-all_validate_images  = np.round(mnist.validation.images)
-
-all_validate_labels  = mnist.validation.labels
-
+for cl in range(num_classes):
+    
+    which_imgs = np.transpose(mnist_data['label']) == cl
+   
+    all_train_labels[which_imgs[:,0], cl] =1
+    
 def compare_algorithms(params ={'num_runs': 20,
                                 'N_train' : all_train_images.shape[0],
                                 'D': all_train_images.shape[1],
@@ -78,7 +82,6 @@ def compare_algorithms(params ={'num_runs': 20,
                        'exp1':{'algorithm' : 'CSS',
                                'algorithm_dict':
                                    {
-                                        'data_samples'  : False,
                                         'num_samples'   : 100,
                                         'resample'      : False,  
                                         'alpha' : 0.5, # 0.7 #0.3 # 0.0 # 0.995 
@@ -108,15 +111,9 @@ def compare_algorithms(params ={'num_runs': 20,
     
     """ master function to compare different algorithms """
     
-    assert params['N_train']  == 55000
-
     assert params['D'] == 784
 
     assert params['report_step'] != None
-
-    params['normal_init']        = True
-
-    params['xavier_init']        = False
     
     if params['equal_per_classes']:
     
@@ -156,16 +153,14 @@ def compare_algorithms(params ={'num_runs': 20,
    
     import theano
     import theano.tensor as T
-    from   model_classes_v2 import BoltzmannMachine
-    from   train_utils import run_experiment
+    from   train_utils   import run_experiment
     ###### specify saving directory ####################################
-    exp1_string = exps['exp1']['algorithm']
-
-    exp2_string = exps['exp2']['algorithm']
-
-    exp3_string = exps['exp3']['algorithm']
-
-    dir_name ="logs_%s_%s_%s"%(exp1_string, exp2_string, exp3_string)
+    dir_name = "logs"
+    for exp_tag in exps.keys():
+        
+        exp_string = exps[exp_tag]['algorithm']
+        
+        dir_name += "_%s"%exp_string
 
     curr_time = datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" )
 
@@ -175,10 +170,20 @@ def compare_algorithms(params ={'num_runs': 20,
 
     os.makedirs(root_path)
 
-    all_params = dict(exps)
+    all_params = copy.deepcopy(exps)
     
+    for exp_tag in all_params.keys():
+        
+        if 'mix_params' in all_params[exp_tag]['algorithm_dict']:
+            
+           coeffs = all_params[exp_tag]['algorithm_dict']['mix_params']
+            
+           np.savetxt(os.path.join(root_path,'MIX_PARAMS.dat'), coeffs) 
+           
+           del all_params[exp_tag]['algorithm_dict']['mix_params']
+        
     all_params['GLOBAL'] =  params
-              
+    
     with open(os.path.join(root_path,'PARAMETERS.json'), 'w') as json_file:
     
          json.dump(all_params, json_file)
@@ -310,11 +315,15 @@ def compare_algorithms(params ={'num_runs': 20,
         if select_images:
            
            if params['equal_per_classes']:
-   
+              
               train_images = utils.select_subset(class_files, 
                                              n = params['num_to_learn']//10,
                                              D = params['D'])
-                                   
+               
+              #inds=np.asarray([1000, 6000, 13000, 20000, 27000,\
+              #32000, 38000, 44000, 52000, 59003])
+              #train_images = train_data_inputs[inds,:]
+              
            else:
        
               train_inds = np.random.choice(range(params['N_train']), 
@@ -370,7 +379,7 @@ def compare_algorithms(params ={'num_runs': 20,
                                                         N= params['num_to_learn'])
                                                    
         blocked_images    = np.copy(imgs_to_reconstruct)
-        blocked_images[which_missing_pixels]    = -1
+        blocked_images[which_missing_pixels]  = 0.5  # = -1
         
         reconst_dict= {}
         w_norms_all = {}
@@ -426,8 +435,9 @@ def compare_algorithms(params ={'num_runs': 20,
                                   blocked_images  = blocked_images,
                                   noisy_images    = noisy_images,
                                   exp_path        = exp_path,
+                                  version         = "v2",
                                   collect_w_norms = w_norms_all,
-                                  collect_reconst  = reconst_dict)
+                                  collect_reconst = reconst_dict)
                                   
                    ##################### reset to the same init values #####             
                    W0 = np.copy(W0_stored)
@@ -477,6 +487,7 @@ def compare_algorithms(params ={'num_runs': 20,
                               blocked_images  = blocked_images,
                               noisy_images    = noisy_images,
                               exp_path        = exp_path,
+                              version         = "v2",
                               collect_w_norms = w_norms_all,
                               collect_reconst  = reconst_dict)
                               
@@ -554,15 +565,19 @@ if __name__ == "__main__":
    
    exps ={'exp1':{'algorithm' : 'CSS',
                   'algorithm_dict':
-                      {
-                           'data_samples'  : False,
-                           'num_samples'   : 100, #[10, 50, 100, 300, 500],
+                          {
+                           'num_samples'   : 10, #[10, 50, 100, 300, 500],
                            'resample'      : False,  
-                           'alpha': None , #0.7, #[0.5, 0.7, 0.3, 0.0, 0.1, 0.9, 0.995],
-                           'uniform_alpha'  :True,
-                           'uniform_with_mf':  True
-                           'mixture': 
-                           'mf_steps'      : 50,
+                           'alpha'         : None, #0.01, # 0.05;
+                           'uniform_to_mf' : False,
+                           'mixture'       : True,
+                           'mix_params'    : np.array([[0.001, 0.998],
+                                                       [0.2,   0.0],
+                                                       [0.1,   0.0],
+                                                       [0.01,  0.0],
+                                                       [0.1,   0.8],
+                                                       [0.01,  0.98]]),
+                           'mf_steps'      : 0, #50,
                            },
                   'report_p_tilda': True,
                   'regressor': None},
@@ -582,34 +597,37 @@ if __name__ == "__main__":
                   'regressor':None}
                        }
                        
-   params ={'num_runs': 1, #40,
+   del exps['exp2']
+   del exps['exp3']
+                       
+   params ={'num_runs': 40, #40,
             'N_train' : all_train_images.shape[0],
             'D': all_train_images.shape[1],
             'use_gpu': False,
-            'num_epochs': 1500,
+            'num_epochs': 15000,   #1500, 
             'report_step':1,
             'save_every_epoch': False,
             'report_w_norm': True,
             'save_init_weights':True,
             'report_pseudo_cost':True,
-            'learning_rate':0.01,
+            'learning_rate': 0.1, #0.01,
             'batch_size':10,
             'use_momentum':True,
-            'momentum':0.95,
+            'momentum' : 0.9,  #0.95,
             'num_hidden':0,
             'num_to_learn':10,
             'equal_per_classes':True,
-            'init_type'   :'ZEROS', # 'ZEROS', 'XAV, 'NORM'
-            'zero_diag'   : False,
+            'init_type':'ZEROS', # 'ZEROS', 'XAV, 'NORM'
+            'zero_diag': False,
             'learn_biases': False,
             'num_reconst_iters' :10,
             'num_to_reconstruct':10,
-            'pflip': 0.1,
-            'pmiss': 0.5}
+            'pflip': 0.2,    #0.1,
+            'pmiss': 0.9}    #0.5}
    
    compare_algorithms(params = params,
                       exps = exps,
-                      experiment_id = "TEST_ZEROW_MF_NR1")
+                      experiment_id = "TEST_MIXTURE_NR40")
    
    
 

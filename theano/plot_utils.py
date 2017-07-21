@@ -261,13 +261,23 @@ def plot_sequences(means_dict,
     _, ax = plt.subplots(num_rows, num_cols, sharex=False,
     figsize=  ( 9*num_cols, 3*num_rows) )
     
-    ax = ax.ravel()
+    if num_rows >1:
+    
+       ax = ax.ravel()
     
     plot_index = 0
     
     use_legend = False
     
     for exp_tag in means_dict.keys():
+        
+        if num_rows ==1:
+            
+           ax_obj = ax
+           
+        elif num_rows >1:
+            
+           ax_obj = ax[plot_index]
         
         if not isinstance(means_dict[exp_tag], dict):
         
@@ -281,16 +291,16 @@ def plot_sequences(means_dict,
            
            if isinstance(std_dict, dict):
         
-              ax[plot_index].errorbar(iters,
-                                      means_dict[exp_tag],
-                                      yerr= std_dict[exp_tag],
-                                      linewidth = 2)
+              ax_obj.errorbar(iters,
+                              means_dict[exp_tag],
+                              yerr= std_dict[exp_tag],
+                              linewidth = 2)
                                    
            else:
             
-              ax[plot_index].plot(iters, 
-                                  means_dict[exp_tag],
-                                  linewidth = 2)
+              ax_obj.plot(iters, 
+                          means_dict[exp_tag], 
+                          linewidth = 2)
               
         else:
             
@@ -308,42 +318,42 @@ def plot_sequences(means_dict,
                
                if isinstance(std_dict, dict):
         
-                  ax[plot_index].errorbar(iters,
-                                          means_dict[exp_tag][x_val],
-                                          yerr= std_dict[exp_tag][x_val],
-                                          label =r"\textbf{%s %s}"
-                                          %(param_name,str(x_val)),
-                                          linewidth = 2)
+                  ax_obj.errorbar(iters,
+                                  means_dict[exp_tag][x_val],
+                                  yerr= std_dict[exp_tag][x_val],
+                                  label =r"\textbf{%s %s}"
+                                   %(param_name,str(x_val)),
+                                  linewidth = 2)
                                    
                else:
                   
-                  ax[plot_index].plot(iters, 
-                                      means_dict[exp_tag][x_val],
-                                      label =r"\textbf{%s %s}"
-                                      %(param_name,str(x_val)),
-                                      linewidth = 2)
+                  ax_obj.plot(iters, 
+                              means_dict[exp_tag][x_val],
+                              label =r"\textbf{%s %s}"
+                              %(param_name,str(x_val)),
+                              linewidth = 2)
                                       
-        ax[plot_index].set_title(r'\textbf{%s}'%exp_tag, size = 15)
+        ax_obj.set_title(r'\textbf{%s}'%exp_tag, size = 15)
         
-        ax[plot_index].set_xlabel(r'\textbf{%s}'%xlabel_dict[exp_tag], 
-                                  fontsize= 15)
+        ax_obj.set_xlabel(r'\textbf{%s}'%xlabel_dict[exp_tag], 
+                          fontsize= 15)
     
-        ax[plot_index].set_ylabel(r'\textbf{%s}'%ylabel_dict[exp_tag], 
-                                  fontsize= 15)
+        ax_obj.set_ylabel(r'\textbf{%s}'%ylabel_dict[exp_tag], 
+                          fontsize= 15)
         
-        ax[plot_index].locator_params(nbins=8, axis='y')
+        ax_obj.locator_params(nbins=8, axis='y')
         
-        ax[plot_index].yaxis.set_tick_params(labelsize = 14)
+        ax_obj.yaxis.set_tick_params(labelsize = 14)
         
-        ax[plot_index].xaxis.set_tick_params(labelsize = 14)
+        ax_obj.xaxis.set_tick_params(labelsize = 14)
         ## alternative to using locat_params:
         #if min_val > 0:
-           #ax[plot_index].yaxis.set_ticks(np.arange(0, max_val, max_val/5))
+           #ax_obj.yaxis.set_ticks(np.arange(0, max_val, max_val/5))
            #pass
         #else:
            #r = max_val-min_val 
-           #ax[plot_index].yaxis.set_ticks(np.arange(min_val, max_val, r/5))
-        
+           #ax_obj.yaxis.set_ticks(np.arange(min_val, max_val, r/5))
+           
         plot_index +=1
         
     if use_legend:
