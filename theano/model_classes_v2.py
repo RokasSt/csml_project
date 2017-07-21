@@ -1480,14 +1480,6 @@ class BoltzmannMachine(object):
                                                   
         elif self.mixture:
            
-           if self.num_samples > self.num_comps:
-                 
-              print("Error: Number of IS samples must not be larger than"+\
-              " the number of mixture components. Current values:")
-              print("self.num_samples : %d"%self.num_samples)
-              print("self.num_comps   : %d"%self.num_comps)
-              sys.exit()
-              
            if not self.resample:
               comp_inds = self.np_rand_gen.choice(self.num_comps,
                                                   self.num_samples,

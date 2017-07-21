@@ -564,7 +564,7 @@ if __name__ == "__main__":
    exps ={'exp1':{'algorithm' : 'CSS',
                   'algorithm_dict':
                           {
-                           'num_samples'   : 10, #[10, 50, 100, 300, 500],
+                           'num_samples'   : [10, 50, 100, 300, 500],
                            'resample'      : False,  
                            'alpha'         : None, #0.01, # 0.05;
                            'uniform_to_mf' : False,
@@ -578,7 +578,7 @@ if __name__ == "__main__":
                            'mf_steps'      : 0, #50,
                            },
                   'report_p_tilda': True,
-                  'regressor': None},
+                  'regressor': 'num_samples'},
           'exp2':{'algorithm'     : 'CD1',
                   'algorithm_dict':
                     {
@@ -595,14 +595,14 @@ if __name__ == "__main__":
                   'regressor':None}
                        }
                        
-   #del exps['exp2']
+   #del exps['exp2']  uncomment for testing CSS specifically
    #del exps['exp3']
    
    params ={'num_runs': 40, #40,
             'N_train' : all_train_images.shape[0],
             'D': all_train_images.shape[1],
             'use_gpu': False,
-            'num_epochs': 15000,   #1500, 
+            'num_epochs': 10000, #15000,   #1500, 
             'report_step':1,
             'save_every_epoch': False,
             'report_w_norm': True,
@@ -615,7 +615,7 @@ if __name__ == "__main__":
             'num_hidden':0,
             'num_to_learn':10,
             'equal_per_classes':True,
-            'init_type':'ZEROS', # 'ZEROS', 'XAV, 'NORM'
+            'init_type':'ZEROS', # options: 'ZEROS', 'XAV, 'NORM'
             'zero_diag': False,
             'learn_biases': False,
             'num_reconst_iters' :10,
@@ -625,7 +625,7 @@ if __name__ == "__main__":
    
    compare_algorithms(params = params,
                       exps = exps,
-                      experiment_id = "MIXTURE_NR40_NE15000")
+                      experiment_id = "MIXTURE_NR40_NE15000_NS_LIST")
    
    
 
