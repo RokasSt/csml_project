@@ -490,7 +490,7 @@ def plot_end_values(means_dict,
     plt.clf()
 ##########################################################################    
 def process_err_dict(means_dict, 
-                     std_dict, 
+                     std_dict =[], 
                      update_dict = None, 
                      bar_plots = True):
     
@@ -520,12 +520,14 @@ def process_err_dict(means_dict,
               output_dict['LABELS'].append(alg)
         
               output_dict['MISSING']['MEANS'].append(means_dict[alg]['MISSING'])
-    
-              output_dict['MISSING']['STD'].append(std_dict[alg]['MISSING'])
-    
+              
               output_dict['NOISY']['MEANS'].append(means_dict[alg]['NOISY'])
+              
+              if std_dict != []:
+                  
+                 output_dict['MISSING']['STD'].append(std_dict[alg]['MISSING'])
     
-              output_dict['NOISY']['STD'].append(std_dict[alg]['NOISY'])
+                 output_dict['NOISY']['STD'].append(std_dict[alg]['NOISY'])
               
            else:
                
@@ -546,14 +548,16 @@ def process_err_dict(means_dict,
                   output_dict['MISSING']['MEANS'].append(\
                   means_dict[alg]['MISSING'][field])
                   
-                  output_dict['MISSING']['STD'].append(\
-                  std_dict[alg]['MISSING'][field])
-                  
                   output_dict['NOISY']['MEANS'].append(\
                   means_dict[alg]['NOISY'][field])
                   
-                  output_dict['NOISY']['STD'].append(\
-                  std_dict[alg]['NOISY'][field])
+                  if std_dict != []:
+                      
+                     output_dict['MISSING']['STD'].append(\
+                     std_dict[alg]['MISSING'][field])
+                  
+                     output_dict['NOISY']['STD'].append(\
+                     std_dict[alg]['NOISY'][field])
                   
        return output_dict
        
@@ -643,6 +647,7 @@ def process_err_dict(means_dict,
 def generate_bar_plots(array_dict, 
                        num_exps, 
                        save_to_path,
+                       ylabel = 'Mean Reconstruction Errors',
                        plot_std = True):
     
     """ function to generate bar plots """    
@@ -679,7 +684,7 @@ def generate_bar_plots(array_dict,
                                  width = width, 
                                  color = 'b')
 
-           ax[plot_index].set_ylabel('Mean Reconstruction Errors')
+           ax[plot_index].set_ylabel(ylabel)
            ax[plot_index].set_xticks(x_axis + width / 2)
            ax[plot_index].set_xticklabels(ordered_labels,
                                           rotation= "vertical")

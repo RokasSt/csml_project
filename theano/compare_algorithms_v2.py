@@ -13,8 +13,6 @@ import shutil
 import os
 import sys
 import json
-import tensorflow as tf
-from   tensorflow.examples.tutorials.mnist import input_data
 import datetime
 import utils
 import argparse
@@ -597,9 +595,9 @@ if __name__ == "__main__":
                   'regressor':None}
                        }
                        
-   del exps['exp2']
-   del exps['exp3']
-                       
+   #del exps['exp2']
+   #del exps['exp3']
+   
    params ={'num_runs': 40, #40,
             'N_train' : all_train_images.shape[0],
             'D': all_train_images.shape[1],
@@ -627,7 +625,7 @@ if __name__ == "__main__":
    
    compare_algorithms(params = params,
                       exps = exps,
-                      experiment_id = "TEST_MIXTURE_NR40")
+                      experiment_id = "MIXTURE_NR40_NE15000")
    
    
 
