@@ -675,7 +675,8 @@ def generate_bar_plots(array_dict,
                                  array_dict[key]['MEANS'], 
                                  width = width, 
                                  color = 'b', 
-                                 yerr  = array_dict[key]['STD'])
+                                 yerr  = array_dict[key]['STD'],
+                                 error_kw=dict(ecolor='red'))
                                  
            else:
                
