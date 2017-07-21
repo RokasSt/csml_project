@@ -3,3 +3,4 @@
 *.*~
 /*/logs_*
 /theano/CLASS*.dat
+*.mat
