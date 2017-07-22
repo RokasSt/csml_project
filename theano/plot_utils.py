@@ -194,8 +194,8 @@ def compare_reconstructions(correct_images,
     for xi in range(num_reconstruct):
         
         if xi ==0:
-               
-           ax[plot_index].set_title("Correct", size = 13) 
+           t = "Correct"
+           ax[plot_index].set_title(r'\textbf{%s}'%t, fontsize = 15) 
     
         ax[plot_index].imshow(np.reshape(correct_images[xi,:], [28,28]))
                
@@ -209,8 +209,8 @@ def compare_reconstructions(correct_images,
     for xi in range(num_reconstruct):
         
         if xi ==0:
-               
-           ax[plot_index].set_title("Corrupted", size = 13) 
+           t = "Corrupted"
+           ax[plot_index].set_title(r'\textbf{%s}'%t, fontsize = 15) 
     
         ax[plot_index].imshow(np.reshape(corrupted_images[xi,:], [28,28]))
                
@@ -226,8 +226,8 @@ def compare_reconstructions(correct_images,
         for xi in range(num_reconstruct):
             
             if xi ==0:
-               
-               ax[plot_index].set_title("%s"%algorithm, size = 13) 
+               t = "%s"%algorithm
+               ax[plot_index].set_title(r'\textbf{%s}'%t, fontsize = 15) 
                
             img = reconstructed_images[algorithm][xi,:] 
     
@@ -477,9 +477,9 @@ def plot_end_values(means_dict,
                                
            ax.set_title(r'\textbf{%s}'%exp_tag, size = 15)  
         
-           ax.set_xlabel(r'\textbf{%s}'%param_name)
+           ax.set_xlabel(r'\textbf{%s}'%param_name, fontsize =14)
     
-           ax.set_ylabel(r'\textbf{%s}'%ylabel_dict[exp_tag])
+           ax.set_ylabel(r'\textbf{%s}'%ylabel_dict[exp_tag], fontsize =14)
         
            ax.locator_params(nbins=8, axis='y')
            
@@ -661,6 +661,10 @@ def generate_bar_plots(array_dict,
     
     ordered_labels = array_dict['LABELS']
     
+    for label_x in range(len(ordered_labels)):
+        
+        ordered_labels[label_x] = r'\textbf{%s}'%ordered_labels[label_x]
+    
     plot_index =0
     
     for key in array_dict.keys():
@@ -676,7 +680,7 @@ def generate_bar_plots(array_dict,
                                  width = width, 
                                  color = 'b', 
                                  yerr  = array_dict[key]['STD'],
-                                 error_kw=dict(ecolor='red'))
+                                 error_kw=dict(ecolor='red', elinewidth=2))
                                  
            else:
                
@@ -685,11 +689,21 @@ def generate_bar_plots(array_dict,
                                  width = width, 
                                  color = 'b')
 
-           ax[plot_index].set_ylabel(ylabel)
+           ax[plot_index].set_ylabel(r'\textbf{%s}'%ylabel, 
+                                     fontsize = 14)
+                                     
            ax[plot_index].set_xticks(x_axis + width / 2)
+           
            ax[plot_index].set_xticklabels(ordered_labels,
-                                          rotation= "vertical")
-           ax[plot_index].set_title('Reconstruction of %s pixels'%str_spec)
+                                          rotation= "vertical",
+                                          fontsize = 14)
+                                           
+           ax[plot_index].set_title(r'\textbf{%s}'
+           %("Reconstruction of %s pixels"%str_spec), fontsize = 15)
+           
+           ax[plot_index].yaxis.set_tick_params(labelsize = 14)
+        
+           ax[plot_index].xaxis.set_tick_params(labelsize = 14)
            
            plot_index +=1
            

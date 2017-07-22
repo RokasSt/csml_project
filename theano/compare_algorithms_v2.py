@@ -564,7 +564,7 @@ if __name__ == "__main__":
    exps ={'exp1':{'algorithm' : 'CSS',
                   'algorithm_dict':
                           {
-                           'num_samples'   : [10, 50, 100, 300, 500],
+                           'num_samples'   : [10, 50, 100],#[10, 50, 100, 300, 500],
                            'resample'      : False,  
                            'alpha'         : None, #0.01, # 0.05;
                            'uniform_to_mf' : False,
