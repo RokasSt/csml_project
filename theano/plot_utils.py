@@ -459,6 +459,15 @@ def plot_end_values(means_dict,
                                      fontsize = 14)
         
            ax[plot_index].locator_params(nbins=8, axis='y')
+           
+           ax[plot_index].set_xlim([x_axis[0] - 0.2*x_axis[0], 
+                                    x_axis[-1]+ 0.05*x_axis[-1]])
+                                    
+           x_list = list(np.arange(x_axis[0], x_axis[-1], (x_axis[-1])/10))  
+        
+           x_list.append(x_axis[-1])
+                            
+           ax[plot_index].xaxis.set_ticks(x_list)
         
            plot_index +=1
            
@@ -483,12 +492,39 @@ def plot_end_values(means_dict,
         
            ax.locator_params(nbins=8, axis='y')
            
+           ax.set_xlim([x_axis[0] - 0.2*x_axis[0], x_axis[-1]+ 0.05*x_axis[-1]])
+           
+           x_list = list(np.arange(x_axis[0], x_axis[-1], (x_axis[-1])/10))  
+        
+           x_list.append(x_axis[-1])
+                            
+           ax.xaxis.set_ticks(x_list)
+           
     plt.tight_layout()
     
     plt.savefig(save_to_path, bbox_inches='tight')
        
     plt.clf()
-##########################################################################    
+##########################################################################   
+def process_dict_to_list(target_dict):
+    
+    """ function to convert dictionary format to list format for
+    bar plotting"""
+    
+    output_dict = {}
+    
+    output_dict['LABELS'] = []
+    
+    output_dict['Y']      = []
+    
+    for field_name in target_dict.keys():
+        
+        output_dict['LABELS'].append(field_name)
+        
+        output_dict['Y'].append(target_dict[field_name])
+        
+    return output_dict
+ 
 def process_err_dict(means_dict, 
                      std_dict =[], 
                      update_dict = None, 
@@ -644,13 +680,65 @@ def process_err_dict(means_dict,
            
        return update_dict, regressor_values
 #######################################################################
-def generate_bar_plots(array_dict, 
-                       num_exps, 
-                       save_to_path,
-                       ylabel = 'Mean Reconstruction Errors',
-                       plot_std = True):
+def generate_bar_plot(y_list,
+                      ordered_labels,
+                      save_to_path,
+                      ylabel,
+                      title,
+                      std_list = []):
     
-    """ function to generate bar plots """    
+    """ function to generate bar plots for a given array"""    
+    fig, ax = plt.subplots(1, 1, sharex=False)
+    
+    width = 0.7
+    
+    x_axis   = np.arange(len(y_list))
+    
+    for label_x in range(len(ordered_labels)):
+        
+        ordered_labels[label_x] = r'\textbf{%s}'%ordered_labels[label_x]
+    
+    if std_list != []:
+              
+       ax.bar(x_axis, 
+              y_list, 
+              width = width, 
+              color = 'b', 
+              yerr  = std_list,
+              error_kw=dict(ecolor='red', elinewidth=2))
+                                 
+    else:
+               
+       ax.bar(x_axis, 
+              y_list, 
+              width = width, 
+              color = 'b')
+
+    ax.set_ylabel(r'\textbf{%s}'%ylabel, fontsize = 14)
+                                     
+    ax.set_xticks(x_axis + width / 2)
+           
+    ax.set_xticklabels(ordered_labels,
+                       rotation= "vertical",
+                       fontsize = 14)
+                                           
+    ax.set_title(r'\textbf{%s}'%title, fontsize = 15)
+           
+    ax.yaxis.set_tick_params(labelsize = 14)
+        
+    ax.xaxis.set_tick_params(labelsize = 14)
+    
+    plt.tight_layout()
+    plt.savefig(save_to_path)
+    plt.clf()
+#######################################################################
+def display_recon_errors(array_dict, 
+                         num_exps, 
+                         save_to_path,
+                         ylabel = 'Mean Reconstruction Errors',
+                         plot_std = True):
+    
+    """ function to generate bar plots of reconstruction errors"""    
     fig, ax = plt.subplots(1, 2, sharex=False)
 
     ax = ax.ravel()
@@ -797,8 +885,17 @@ def plot_regressions(y_dict,
         
         ax[plot_index].xaxis.set_tick_params(labelsize = 14)
         
-        ax[plot_index].set_xlim([x_values[0], 
+        ax[plot_index].set_xlim([x_values[0] -0.2*x_values[0], 
                                  x_values[-1]+0.05*x_values[-1]])
+                                 
+        #ax[plot_index].xaxis.set_ticks(np.arange(x_values[0], x_values[-1]+15, 
+                                      #(x_values[-1])/5) )
+                                      
+        x_list = list(np.arange(x_values[0], x_values[-1], (x_values[-1])/10))  
+        
+        x_list.append(x_values[-1])
+                            
+        ax[plot_index].xaxis.set_ticks(x_list)
         
         plot_index +=1
         
@@ -867,54 +964,6 @@ def add_data(target_path,
           
     return look_at_dict
 ##############################################################################  
-def get_regressor_value(target_path, 
-                        param_name,
-                        algorithm_specific):
-    
-    """ function to obtain a regressor value from a given json file
-    assumes that there is a single parameter dictionary per each individual
-    algorithm (one-to-one mapping), for example
-    
-    exp1 - CSS
-    
-    exp2 - CD
-    
-    exp3 - PCD
-    
-    but then
-    
-    exp4 - PCD is not allowed.
-    
-    """
-    
-    param_value  = None
-
-    with open(target_path, 'r') as json_file:
-    
-         param_dict = json.load(json_file)
-          
-    for exp_tag in param_dict.keys():
-         
-        exp_params = param_dict[exp_tag]
-        
-        if algorithm_specific:
-            
-           if param_name in exp_params['algorithm_dict'].keys():
-           
-              param_value = exp_params['algorithm_dict'][param_name] 
-              
-              break
-           
-        else:
-            
-           if param_name in exp_params.keys():
-              
-              param_value = exp_params[param_name]
-             
-              break
-          
-    return param_value
-##########################################################################
 def plot_temporal_data(list_target_dirs,
                        target_dict,
                        xlabel_dict,
@@ -940,9 +989,9 @@ def plot_temporal_data(list_target_dirs,
            print("Regressor is specified: %s"%regressor)
            path_to_params = os.path.join(target_dir, param_dict_name)
            
-           regressor_val = get_regressor_value(path_to_params, 
-                                               regressor,
-                                               algorithm_spec)
+           regressor_val = utils.get_regressor_value(path_to_params, 
+                                                     regressor,
+                                                     algorithm_spec)
            
            assert regressor_val != None
            
@@ -1169,9 +1218,9 @@ def plot_recon_errors(list_target_dirs,
            print("Regressor is specified: %s"%regressor)
            path_to_params = os.path.join(target_dir, param_dict_name)
            
-           regressor_val = get_regressor_value(path_to_params, 
-                                               regressor,
-                                               algorithm_spec)
+           regressor_val = utils.get_regressor_value(path_to_params, 
+                                                     regressor,
+                                                     algorithm_spec)
            
            assert regressor_val != None
            
@@ -1214,10 +1263,10 @@ def plot_recon_errors(list_target_dirs,
            
            num_bars = len(dict_of_lists['LABELS'])
            
-           generate_bar_plots(array_dict   = dict_of_lists,
-                              num_exps     = num_bars,            
-                              save_to_path = save_to_path,
-                              plot_std     = error_bars)
+           display_recon_errors(array_dict   = dict_of_lists,
+                                num_exps     = num_bars,            
+                                save_to_path = save_to_path,
+                                plot_std     = error_bars)
                                     
         else: 
             

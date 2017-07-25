@@ -13,10 +13,12 @@ import numpy as np
 import cPickle
 import Image
 import sys
+import json
 from   plot_utils import make_raster_plots
 from   collections import OrderedDict
 import timeit
 import os
+import scipy.io
 
 class BoltzmannMachine(object):
     
@@ -68,7 +70,7 @@ class BoltzmannMachine(object):
         
         self.num_cd_steps   = None
         
-        self.resample       = None
+        self.resample       = False
         
         self.uniform_to_mf  = False
         
@@ -175,44 +177,9 @@ class BoltzmannMachine(object):
                  print("Error: parameters defining mixture means were"+\
                  " not provided")
                  sys.exit()
-
-              self.mix_means = []
-              
-              for i in range(self.mix_params.shape[0]):
-                  # first component bias; second component multiplier
-                  if self.mix_means == []:
-                      
-                     if self.mix_params[i,1] !=0:
-                         
-                        self.mix_means =\
-                        self.mix_params[i,0]+ self.mix_params[i,1]*training_inputs
-                        
-                     else:
-                         
-                        self.mix_means =\
-                        self.mix_params[i,0]*np.ones([1,self.num_vars])
-                        
-                     self.mix_means = np.asarray(self.mix_means,
-                                                 dtype = theano.config.floatX)
-                  else:
-                      
-                     if self.mix_params[i,1] !=0:
-                         
-                        add_comp =\
-                        self.mix_params[i,0]+ self.mix_params[i,1]*training_inputs
-                        
-                     else:
-                         
-                        add_comp =\
-                        self.mix_params[i,0]*np.ones([1,self.num_vars])
-                     
-                     self.mix_means = np.vstack([self.mix_means,add_comp])
-                     
-              self.num_comps = self.mix_means.shape[0]
-              
-              self.mix_means = theano.shared(self.mix_means,
-                                             name = 'mix_means')
-                                
+                 
+              self.set_mixture_means(inputs = training_inputs)
+                                             
            if use_momentum:
                
               print("Will add momentum term to gradient computations")
@@ -376,7 +343,47 @@ class BoltzmannMachine(object):
                  self.mf_hid_p = theano.shared(init_mf_hid, 
                                                name= "mf_hid_p", 
                                                borrow= True)
-                  
+                                               
+    def set_mixture_means(self, inputs):
+        
+        """ function to set parameters of the mixture of Bernoulli products
+        with coefficient matrix"""
+        
+        self.mix_means = []
+              
+        for i in range(self.mix_params.shape[0]):
+            # first component bias; second component multiplier
+            if self.mix_means == []:
+                      
+               if self.mix_params[i,1] !=0:
+                  self.mix_means =\
+                  self.mix_params[i,0]+ self.mix_params[i,1]*inputs
+                        
+               else:
+                         
+                  self.mix_means =\
+                  self.mix_params[i,0]*np.ones([1,self.num_vars])
+                        
+               self.mix_means = np.asarray(self.mix_means,
+                                           dtype = theano.config.floatX)
+            else:
+                      
+               if self.mix_params[i,1] !=0:
+                         
+                  add_comp =\
+                  self.mix_params[i,0]+ self.mix_params[i,1]*inputs
+                        
+               else:
+                         
+                  add_comp =\
+                  self.mix_params[i,0]*np.ones([1,self.num_vars])
+                     
+               self.mix_means = np.vstack([self.mix_means,add_comp])
+                     
+        self.num_comps = self.mix_means.shape[0]
+              
+        self.mix_means = theano.shared(self.mix_means, name = 'mix_means')
+                                            
     def energy_function(self, x):
     
         """ to compute energy function for fully visible Boltzmann machine
@@ -1131,6 +1138,194 @@ class BoltzmannMachine(object):
         cost_estimate = sum(cost_estimate)/float(num_steps)
         
         return cost_estimate
+        
+    def get_algorithm_dict(self, param_dict, algorithm):
+        
+        """ function to obtain settings' dictionary
+        for a given algorithm"""
+        
+        output_dict = None
+        
+        for exp_field in param_dict.keys():
+            
+            if param_dict[exp_field]['algorithm'] == algorithm:
+                
+               outpu_dict = param_dict[exp_field]['algorithm_dict']
+                
+        return output_dict       
+        
+    def test_energy_gap(self, 
+                        target_dir, 
+                        target_file  = "TRAINED_PARAMS_END.model",
+                        num_to_test  = 100,
+                        given_inputs = []):
+    
+        """ function to compare data-specific and approximating term
+        of partition function of Boltzmann Machine trained with
+        different algorithms"""
+        
+        path_to_json  = os.path.join(target_dir, "PARAMETERS.json")
+    
+        with open(path_to_json, 'r') as json_file:
+    
+             param_dict = json.load(json_file)
+             
+        self.num_hidden    = param_dict['GLOBAL']['num_hidden']
+        
+        path_to_mix_params = os.path.join(target_dir, "MIX_PARAMS.dat")
+        
+        reg_dict = {}
+        
+        for f_name in param_dict.keys():
+            
+            if f_name != "GLOBAL":
+               reg_dict[param_dict[f_name]['algorithm']] =\
+               param_dict[f_name]['regressor']
+        
+        self.mixture = False
+        
+        E_gaps = {}
+        
+        if os.path.exists(path_to_mix_params):
+            
+           self.mixture = True
+           
+           self.mix_params = np.loadtxt(path_to_mix_params)
+           
+        for sub_f1 in os.listdir(target_dir):
+    
+            sub_dir = os.path.join(target_dir, sub_f1)
+    
+            if os.path.isdir(sub_dir) and "run" in sub_f1: 
+               print("Processing %s"%sub_dir)
+               tr_file  = "TRAIN_IMAGES.dat"
+               check_input_file = os.path.join(sub_dir, tr_file)
+               
+               if os.path.exists(check_input_file):
+                  inputs = np.loadtxt(check_input_file)
+                  # to make fair comparison, number of is samples
+                  # is set to the number of  test inputs
+                  self.num_samples = inputs.shape[0]
+               else:
+                  
+                  if isinstance(given_inputs, np.ndarray):
+                     N = given_inputs.shape[0]
+                     inds = self.np_rand_gen.choice(N, 
+                                                    num_to_test,
+                                                    replace = False)
+                     
+                     inputs = given_inputs[inds,:]
+                     
+                     self.num_samples = num_to_test
+                     
+                  else:
+                     print("Error: %s does not contain file %s"
+                     %(sub_dir2, tr_file) +" and given_inputs is []")
+                     print("Script execution will terminate") 
+                     sys.exit()
+               
+               self.batch_size  = inputs.shape[0]
+               
+               if self.mixture:
+                  self.set_mixture_means(inputs = inputs)
+        
+               is_samples, _ = self.is_sampler(training = False)
+               
+               for sub_f2 in os.listdir(sub_dir):
+           
+                   sub_dir2 = os.path.join(sub_dir, sub_f2)
+                   
+                   if os.path.isdir(sub_dir2):
+                      
+                      if "_" in sub_f2:
+                         algorithm = sub_f2.split("_")[0]
+                      else:
+                         algorithm = sub_f2
+                         
+                      field_name =algorithm  
+                       
+                      if reg_dict[algorithm] != None:
+                         if reg_dict[algorithm] in sub_f2:
+                            if "_" in reg_dict[algorithm]:
+                               reg_name_s = reg_dict[algorithm].split("_")
+                            
+                               reg_name_s = reg_name_s[0][0].upper() +\
+                               reg_name_s[1][0].upper()
+                               field_name +=" %s"%reg_name_s
+                            else:
+                               field_name +=" %s"%reg_dict[algorithm]
+                            
+                            get_val = sub_f2
+                            get_val = get_val.split(reg_dict[algorithm])[1]
+                         
+                            field_name +=" %s"%get_val
+                      
+                      if field_name not in E_gaps.keys():
+                          
+                         E_gaps[field_name] = []
+                      
+                      par_path = os.path.join(sub_dir2, target_file)
+                      
+                      if os.path.exists(par_path):
+                         
+                         css_diff =\
+                         self.compare_css_terms(x_inputs  = inputs,
+                                                x_samples = is_samples,
+                                                full_path = par_path)
+                                                
+                         E_gaps[field_name].append(css_diff)
+                          
+                      else:
+                          
+                         print("Error: %s does not exist"%par_path)
+                         sys.exit()
+        
+        return E_gaps
+                                                 
+    def compare_css_terms(self, x_inputs, x_samples, full_path):
+    
+        """ function to obtain comparison between values of data term and
+        complementary term in the CSS approximation """
+        
+        self.load_model_params(full_path)
+                                
+        data_term = self.get_data_term()
+        is_term   = self.get_is_term()
+        
+        norm_diff = (is_term - data_term) #/is_term # could be changed
+        
+        get_norm_diff = theano.function(inputs = [self.x, self.x_tilda],
+                                        outputs = norm_diff)
+                                        
+        norm_diff_val = get_norm_diff(x_inputs, x_samples)
+        
+        return norm_diff_val
+        
+    def get_data_term(self):
+    
+        """ function to compute data term in CSS aproximation
+        of partition function.
+        (for now assumes that resampling option is not available) """
+    
+        if self.num_hidden == 0:
+            
+           data_term = -self.compute_energy(self.x, self.batch_size)
+              
+        else:
+               
+           data_term = -self.compute_free_energy(self.x)
+    
+        return T.sum(T.exp(-data_term))
+    
+    def get_is_term(self):
+    
+        """ function to compute a complementary (approximating) term
+        in the CSS approximation of partition function.
+        (for now assumes that resampling option is not available)"""
+    
+        approx_Z = self.add_is_approximation()
+    
+        return T.sum(T.exp(approx_Z))
                                       
     def test_p_tilda(self, test_inputs, random_inputs, training):
         
@@ -1420,8 +1615,8 @@ class BoltzmannMachine(object):
                        if test_mode and num_checked <= check_counter:
                           break
         return recon_images
-        
-    def is_sampler(self, t):
+    
+    def is_sampler(self, training = True, t = None):
         
         """ function to obtain samples from importance distribution """
         
@@ -1431,7 +1626,7 @@ class BoltzmannMachine(object):
            shape_out = (self.num_samples, self.num_vars)
         
         if (not self.mixture) and (self.mf_steps > 0):
-           if self.alpha > 0:
+           if self.alpha > 0 and training:
               print("Updating MF parameters ...")
               mf_t0 = timeit.default_timer()
               self.do_mf_updates(num_steps = self.mf_steps)
@@ -1439,7 +1634,7 @@ class BoltzmannMachine(object):
               print("%d steps of MF updates took --- %f minutes"%
               (self.mf_steps,(mf_t1 -mf_t0)/60.0))
            
-           if self.uniform_to_mf:
+           if self.uniform_to_mf and t != None:
               ## if alpha is zero, uniform importance sampling
               ## is used throughout the training process
               

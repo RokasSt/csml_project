@@ -21,25 +21,9 @@ import os
 from matplotlib import pyplot as plt
 import plot_utils
 import copy
-import scipy.io
 
 print("Importing data ...")
-mnist_data = scipy.io.loadmat("mnist-original")
-
-all_train_images = np.round(np.transpose(mnist_data['data'])/255.0)
-
-print(all_train_images.shape)
-
-num_classes = 10
-num_examples = mnist_data['label'].shape[1]
-
-all_train_labels = np.zeros([num_examples, num_classes])
-
-for cl in range(num_classes):
-    
-    which_imgs = np.transpose(mnist_data['label']) == cl
-   
-    all_train_labels[which_imgs[:,0], cl] =1
+all_train_images, all_train_labels = utils.get_data_arrays()
     
 def compare_algorithms(params ={'num_runs': 20,
                                 'N_train' : all_train_images.shape[0],
@@ -553,10 +537,10 @@ def compare_algorithms(params ={'num_runs': 20,
 
     save_bar_plots_to =  os.path.join(root_path,"BAR_ERRORS.jpeg")
 
-    plot_utils.generate_bar_plots(array_dict   = dict_of_lists,
-                                  num_exps     = num_algorithms+sub_count,            
-                                  save_to_path = save_bar_plots_to,
-                                  plot_std     = True)
+    plot_utils.display_recon_errors(array_dict   = dict_of_lists,
+                                    num_exps     = num_algorithms+sub_count,            
+                                    save_to_path = save_bar_plots_to,
+                                    plot_std     = True)
 
 ########################################################################       
 if __name__ == "__main__":
@@ -564,7 +548,7 @@ if __name__ == "__main__":
    exps ={'exp1':{'algorithm' : 'CSS',
                   'algorithm_dict':
                           {
-                           'num_samples'   : [10, 50, 100],#[10, 50, 100, 300, 500],
+                           'num_samples'   : 500, #[10, 50, 100],#[10, 50, 100, 300, 500],
                            'resample'      : False,  
                            'alpha'         : None, #0.01, # 0.05;
                            'uniform_to_mf' : False,
@@ -578,7 +562,8 @@ if __name__ == "__main__":
                            'mf_steps'      : 0, #50,
                            },
                   'report_p_tilda': True,
-                  'regressor': 'num_samples'},
+                  'regressor': None, #'num_samples'
+                  },
           'exp2':{'algorithm'     : 'CD1',
                   'algorithm_dict':
                     {
@@ -595,10 +580,10 @@ if __name__ == "__main__":
                   'regressor':None}
                        }
                        
-   #del exps['exp2']  uncomment for testing CSS specifically
-   #del exps['exp3']
+   del exps['exp2'] #  uncomment for testing CSS specifically
+   del exps['exp3']
    
-   params ={'num_runs': 40, #40,
+   params ={'num_runs': 1, #40,
             'N_train' : all_train_images.shape[0],
             'D': all_train_images.shape[1],
             'use_gpu': False,
@@ -625,7 +610,7 @@ if __name__ == "__main__":
    
    compare_algorithms(params = params,
                       exps = exps,
-                      experiment_id = "MIXTURE_NR40_NE15000_NS_LIST")
+                      experiment_id = "MIXTURE_TEST_NS500")
    
    
 

@@ -14,6 +14,7 @@ import os
 import matplotlib
 matplotlib.use('agg',warn=False, force=True)
 from matplotlib import pyplot as plt
+import scipy.io
 
 def energy_function(W, b, x):
     
@@ -215,7 +216,75 @@ def tile_the_lists(dict_lists, num_reg_values):
                     if len(dict_lists[f1][f2]) == 1:
                        dict_lists[f1][f2] = num_reg_values*dict_lists[f1][f2]
                    
-    return dict_lists              
+    return dict_lists  
+    
+def get_data_arrays(file_name = "mnist-original", num_classes = 10):
+    
+    """ function to load data into numpy arrays """
+    
+    mnist_data = scipy.io.loadmat(file_name)
+
+    images = np.round(np.transpose(mnist_data['data'])/255.0)
+ 
+    num_examples = mnist_data['label'].shape[1]
+
+    labels = np.zeros([num_examples, num_classes])
+
+    for cl in range(num_classes):
+    
+        which_imgs = np.transpose(mnist_data['label']) == cl
+   
+        labels[which_imgs[:,0], cl] =1
+        
+    return images, labels
+##########################################################################
+def get_regressor_value(target_path, 
+                        param_name,
+                        algorithm_specific):
+    
+    """ function to obtain a regressor value from a given json file
+    assumes that there is a single parameter dictionary per each individual
+    algorithm (one-to-one mapping), for example
+    
+    exp1 - CSS
+    
+    exp2 - CD
+    
+    exp3 - PCD
+    
+    but then
+    
+    exp4 - PCD is not allowed.
+    
+    """
+    
+    param_value  = None
+
+    with open(target_path, 'r') as json_file:
+    
+         param_dict = json.load(json_file)
+          
+    for exp_tag in param_dict.keys():
+         
+        exp_params = param_dict[exp_tag]
+        
+        if algorithm_specific:
+            
+           if param_name in exp_params['algorithm_dict'].keys():
+           
+              param_value = exp_params['algorithm_dict'][param_name] 
+              
+              break
+           
+        else:
+            
+           if param_name in exp_params.keys():
+              
+              param_value = exp_params[param_name]
+             
+              break
+          
+    return param_value
 ########################################################################
 if __name__ == "__main__":
     
