@@ -10,6 +10,7 @@ import matplotlib
 matplotlib.use('agg',warn=False, force=True)
 from matplotlib import pyplot as plt
 from matplotlib import rc,rcParams
+from matplotlib.pyplot import cm 
 import subprocess
 import os
 import sys
@@ -684,7 +685,7 @@ def generate_bar_plot(y_list,
                       ordered_labels,
                       save_to_path,
                       ylabel,
-                      title,
+                      title = None,
                       std_list = []):
     
     """ function to generate bar plots for a given array"""    
@@ -721,8 +722,9 @@ def generate_bar_plot(y_list,
     ax.set_xticklabels(ordered_labels,
                        rotation= "vertical",
                        fontsize = 14)
-                                           
-    ax.set_title(r'\textbf{%s}'%title, fontsize = 15)
+    
+    if title != None:
+       ax.set_title(r'\textbf{%s}'%title, fontsize = 15)
            
     ax.yaxis.set_tick_params(labelsize = 14)
         
@@ -797,6 +799,81 @@ def display_recon_errors(array_dict,
            
     plt.tight_layout()
     plt.savefig(save_to_path)
+    plt.clf()
+########################################################################
+def generate_scatter_plot(x_dict, 
+                          y_dict,
+                          x_label,
+                          y_label, 
+                          title_dict,
+                          save_to_path):
+                              
+    """ function to generate scatter plot over given arrays"""
+    
+    num_cols = len(x_dict.keys())
+    
+    _, ax = plt.subplots(1, num_cols, sharex=False)
+    
+    if num_cols > 1:
+       ax = ax.ravel()
+    
+    plot_index = 0
+    
+    for exp_type in x_dict.keys():
+        
+        if num_cols > 1:
+           ax_obj = ax[plot_index]
+           
+        else:
+           ax_obj = ax
+           
+        num_required =  len(x_dict[exp_type].keys())
+           
+        color_selector=iter(cm.rainbow(np.linspace(0,1,num_required)))
+        
+        for alg in x_dict[exp_type].keys():
+            
+            x_values = np.array(x_dict[exp_type][alg])
+            
+            if exp_type in y_dict.keys():
+                
+               y_values = np.array(y_dict[exp_type][alg])
+               
+            else:
+                
+               y_values = np.array(y_dict[alg]) 
+            
+            assert len(x_values) == len(y_values)
+            
+            ax_obj.scatter(x_values,
+                           y_values,
+                           label = r"\textbf{%s}"%alg,
+                           marker = "o",
+                           c = next(color_selector),
+                           s = 25)
+        
+        ax_obj.set_xlabel(r'\textbf{%s}'%x_label, fontsize=15)
+    
+        ax_obj.set_ylabel(r'\textbf{%s}'%y_label, fontsize =15)
+        
+        ax_obj.set_title(r'\textbf{%s}'%title_dict[exp_type], fontsize=15)
+        
+        ax_obj.locator_params(nbins=8, axis='y')
+        
+        ax_obj.locator_params(nbins=8, axis='x')
+        
+        ax_obj.yaxis.set_tick_params(labelsize = 14)
+        
+        ax_obj.xaxis.set_tick_params(labelsize = 14)
+        
+        plot_index +=1
+        
+    plt.legend(loc='lower center', bbox_to_anchor=(0.05, -0.2), ncol = 5)
+    
+    plt.tight_layout()
+    
+    plt.savefig(save_to_path, bbox_inches='tight')
+       
     plt.clf()
 ########################################################################
 def plot_regressions(y_dict, 

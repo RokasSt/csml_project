@@ -1154,11 +1154,16 @@ class BoltzmannMachine(object):
                 
         return output_dict       
         
-    def test_energy_gap(self, 
+    def analyse_results(self, 
                         target_dir, 
-                        target_file  = "TRAINED_PARAMS_END.model",
-                        num_to_test  = 100,
-                        given_inputs = []):
+                        param_file     = "TRAINED_PARAMS_END.model",
+                        w_norm_file    = "W_NORMS.dat",
+                        num_to_test    = 100,
+                        get_means_from = {
+                         'NOISY'  :'RECONST_NOISY_ERRORS.dat',
+                         'MISSING':'RECONST_MISSING_ERRORS.dat'
+                             },
+                        given_inputs   = []):
     
         """ function to compare data-specific and approximating term
         of partition function of Boltzmann Machine trained with
@@ -1171,6 +1176,8 @@ class BoltzmannMachine(object):
              param_dict = json.load(json_file)
              
         self.num_hidden    = param_dict['GLOBAL']['num_hidden']
+        
+        num_runs           = param_dict['GLOBAL']['num_runs']
         
         path_to_mix_params = os.path.join(target_dir, "MIX_PARAMS.dat")
         
@@ -1186,17 +1193,29 @@ class BoltzmannMachine(object):
         
         E_gaps = {}
         
+        recon_errors = {}
+        
+        p_tilda_data = {}
+        
+        end_w_norms  = {}
+        
+        for field in get_means_from.keys():
+            
+            recon_errors[field] = {}
+        
         if os.path.exists(path_to_mix_params):
             
            self.mixture = True
            
            self.mix_params = np.loadtxt(path_to_mix_params)
            
-        for sub_f1 in os.listdir(target_dir):
-    
+        for run_ind in range(num_runs):
+            
+            sub_f1 = "run%s"%run_ind
+            
             sub_dir = os.path.join(target_dir, sub_f1)
     
-            if os.path.isdir(sub_dir) and "run" in sub_f1: 
+            if os.path.isdir(sub_dir): 
                print("Processing %s"%sub_dir)
                tr_file  = "TRAIN_IMAGES.dat"
                check_input_file = os.path.join(sub_dir, tr_file)
@@ -1263,24 +1282,58 @@ class BoltzmannMachine(object):
                       if field_name not in E_gaps.keys():
                           
                          E_gaps[field_name] = []
+                         
+                      if field_name not in p_tilda_data.keys():
+                          
+                         p_tilda_data[field_name] = []
+                         
+                      if field_name not in end_w_norms.keys():
+                          
+                         end_w_norms[field_name]  = []
                       
-                      par_path = os.path.join(sub_dir2, target_file)
+                      par_path = os.path.join(sub_dir2, param_file)
+                      
+                      w_norms_path = os.path.join(sub_dir2, w_norm_file)
+                      
+                      w_norms      = np.loadtxt(w_norms_path)
+                      
+                      end_w_norms[field_name].append(w_norms[-1])
                       
                       if os.path.exists(par_path):
                          
-                         css_diff =\
+                         css_diff, p_tilda_vals =\
                          self.compare_css_terms(x_inputs  = inputs,
                                                 x_samples = is_samples,
                                                 full_path = par_path)
                                                 
                          E_gaps[field_name].append(css_diff)
+                         
+                         mean_val = np.mean(p_tilda_vals[0:self.batch_size])
+                         
+                         p_tilda_data[field_name].append(mean_val)
                           
                       else:
                           
                          print("Error: %s does not exist"%par_path)
                          sys.exit()
-        
-        return E_gaps
+                         
+                      for f_exp in get_means_from.keys():
+                          
+                          file_name = get_means_from[f_exp]
+                          
+                          check_err_file = os.path.join(sub_dir2, file_name)
+                          
+                          errors = np.loadtxt(check_err_file)
+                          
+                          mean_val = np.mean(errors)
+                          
+                          if field_name not in recon_errors[f_exp].keys():
+                          
+                             recon_errors[f_exp][field_name] = []
+                             
+                          recon_errors[f_exp][field_name].append(mean_val)
+                             
+        return E_gaps, recon_errors, p_tilda_data, end_w_norms
                                                  
     def compare_css_terms(self, x_inputs, x_samples, full_path):
     
@@ -1292,14 +1345,16 @@ class BoltzmannMachine(object):
         data_term = self.get_data_term()
         is_term   = self.get_is_term()
         
-        norm_diff = (is_term - data_term) #/is_term # could be changed
+        diff_var = T.log(is_term - data_term)
         
-        get_norm_diff = theano.function(inputs = [self.x, self.x_tilda],
-                                        outputs = norm_diff)
+        self.add_p_tilda()
+        
+        get_css_diff = theano.function(inputs  = [self.x, self.x_tilda],
+                                       outputs = [diff_var, self.p_tilda])
                                         
-        norm_diff_val = get_norm_diff(x_inputs, x_samples)
+        diff_val, p_tilda_vals = get_css_diff(x_inputs, x_samples)
         
-        return norm_diff_val
+        return diff_val, p_tilda_vals
         
     def get_data_term(self):
     

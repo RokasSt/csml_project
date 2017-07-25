@@ -23,8 +23,7 @@ full_dataset = False
 
 if full_dataset:
    print("Importing data ...")
-   all_train_images, all_train_labels = \
-   utils.get_data_arrays(file_name = "mnist-original")
+   images, labels = utils.get_data_arrays(file_name = "mnist-original")
 
 ###############################
 
@@ -41,28 +40,35 @@ bm = BoltzmannMachine(num_vars        = D,
                       training        = False)
 
 if full_dataset:
-   energy_gaps = bm.test_energy_gap(target_dir = target_dir,
-                                    given_inputs = all_train_images)
+    
+   energy_gaps, recon_errors, test_p_tilda, w_norms =\
+   bm.analyse_results(target_dir  = target_dir,
+                      given_inputs= images)
                       
 else:
-   energy_gaps = bm.test_energy_gap(target_dir = target_dir)
+    
+   energy_gaps, recon_errors, test_p_tilda, w_norms =\
+   bm.analyse_results(target_dir = target_dir)
    
 std_dict  = {}
 
 mean_dict = {}
-   
-for exp_tag in energy_gaps.keys():
-    
-    energy_gaps[exp_tag] = energy_gaps[exp_tag]/np.max(energy_gaps[exp_tag])
-    
-    std_dict[exp_tag]    = np.std(energy_gaps[exp_tag])
-    
-    mean_dict[exp_tag]   = np.mean(energy_gaps[exp_tag])
 
-print("Means:")
-print(mean_dict)
-print("Standard deviations:")
-print(std_dict)
+titles    = {}
+
+for algorithm in energy_gaps.keys():
+    
+    std_dict[algorithm]  = np.std(energy_gaps[algorithm])
+    
+    mean_dict[algorithm] = np.mean(energy_gaps[algorithm])
+    
+for recon_exp  in recon_errors.keys():
+    
+    build_title = recon_exp[0].upper() + recon_exp[1:].lower()
+    
+    build_title += " pixels"
+    
+    titles[recon_exp] = build_title
 
 means_and_labels = plot_utils.process_dict_to_list(mean_dict)
 
@@ -76,12 +82,44 @@ list_of_stds   = std_and_labels['Y']
 
 save_to_path = os.path.join(target_dir, "BAR_ENERGY_GAPS.jpeg")
 
+bar_title = "Difference between Data Term and Complementary Term"
+
 plot_utils.generate_bar_plot(y_list = list_of_means,
                              ordered_labels = list_of_labels,
                              save_to_path = save_to_path,
-                             ylabel = "Normalized Energy Gap",
-                             title = "Average Energy Gaps (40 runs)",
+                             ylabel = "Log (Difference)",
+                             title = bar_title,
                              std_list = list_of_stds)
+                             
+save_to_path = os.path.join(target_dir, "ENERGY_GAPS_VS_ERRORS.jpeg")
+                             
+plot_utils.generate_scatter_plot(x_dict  = recon_errors, 
+                                 y_dict  = energy_gaps,
+                                 x_label = "Average Reconstruction Error",
+                                 y_label = "Log(Data Term - IS Term)", 
+                                 title_dict = titles,
+                                 save_to_path = save_to_path)
+                                 
+save_to_path = os.path.join(target_dir, "ENERGY_GAPS_VS_P_TILDA.jpeg")
+                                 
+plot_utils.generate_scatter_plot(x_dict  = recon_errors, 
+                                 y_dict  = test_p_tilda,
+                                 x_label = "Average Reconstruction Error",
+                                 y_label = "Average p tilda", 
+                                 title_dict   = titles,
+                                 save_to_path = save_to_path)
+                                 
+save_to_path = os.path.join(target_dir, "ENERGY_GAPS_VS_W_NORMS.jpeg")
+                                 
+plot_utils.generate_scatter_plot(x_dict  = recon_errors, 
+                                 y_dict  = w_norms,
+                                 x_label = "Average Reconstruction Error",
+                                 y_label = "L2-norm on W", 
+                                 title_dict   = titles,
+                                 save_to_path = save_to_path)
+                                 
+                             
+
     
 
 
