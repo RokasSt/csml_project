@@ -242,9 +242,8 @@ def compare_algorithms(params ={'num_runs': 20,
       
     avg_errors = {}
 
-    num_algorithms = len(exps.keys())
+    num_bars = 0
     ################ prepare dictionary for average reconstruction errors
-    sub_count = 0
     for tag in exps.keys():
     
         avg_errors[exps[tag]['algorithm']] = {}
@@ -260,8 +259,6 @@ def compare_algorithms(params ={'num_runs': 20,
            
            assert isinstance(get_vals,list) == True
            
-           sub_count += len(get_vals)
-           
            avg_errors[exps[tag]['algorithm']]['MISSING'] = {}
            
            avg_errors[exps[tag]['algorithm']]['NOISY']   = {}
@@ -275,6 +272,8 @@ def compare_algorithms(params ={'num_runs': 20,
            
                avg_errors[exps[tag]['algorithm']]['NOISY'][field]  = \
                np.zeros(params['num_runs'])
+               
+               num_bars +=1
         
         else:
     
@@ -284,8 +283,8 @@ def compare_algorithms(params ={'num_runs': 20,
            avg_errors[exps[tag]['algorithm']]['NOISY'] = \
            np.zeros(params['num_runs'])
            
-    if sub_count > 0:
-       sub_count -=1
+           num_bars +=1
+    
     ####################################################################
     ### run experiments ################################################
     for run_index in range(params['num_runs']):
@@ -534,18 +533,24 @@ def compare_algorithms(params ={'num_runs': 20,
     dict_of_lists = plot_utils.process_err_dict(means_dict = avg_errors,
                                                 std_dict = std_errors,
                                                 bar_plots = True)
-
+    
     save_bar_plots_to =  os.path.join(root_path,"BAR_ERRORS.jpeg")
+    
+    plot_std = False
+    
+    if params['num_runs'] > 1:
+        
+       plot_std  = True
 
     plot_utils.display_recon_errors(array_dict   = dict_of_lists,
-                                    num_exps     = num_algorithms+sub_count,            
+                                    num_exps     = num_bars,            
                                     save_to_path = save_bar_plots_to,
-                                    plot_std     = True)
+                                    plot_std     = plot_std)
 
 ########################################################################       
 if __name__ == "__main__":
    
-   exps ={'exp1':{'algorithm' : 'CSS',
+   exps ={'exp1':{'algorithm'     : 'CSS_GIBBS',
                   'algorithm_dict':
                           {#500, #[10, 50, 100],#[10, 50, 100, 300, 500],
                            'num_samples'   : [10, 60],
@@ -591,13 +596,13 @@ if __name__ == "__main__":
                            'gibbs_steps'   : 0,
                            },
                   'report_p_tilda': True,
-                  'regressor': 'num_samples'
+                  'regressor': 'num_samples',
                   },            }
                        
    #del exps['exp2'] #  uncomment for testing CSS specifically
    #del exps['exp3']
    
-   params ={'num_runs': 40, #40,
+   params ={'num_runs': 40,
             'N_train' : all_train_images.shape[0],
             'D': all_train_images.shape[1],
             'use_gpu': False,

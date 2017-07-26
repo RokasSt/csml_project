@@ -995,7 +995,7 @@ class BoltzmannMachine(object):
         """ function to define a theano function which implements
         a single learning step"""
         
-        if self.algorithm =="CSS":
+        if "CSS" in self.algorithm:
            
            input_dict = {self.x: self.train_inputs[self.minibatch_set,:]}
                         
@@ -1887,7 +1887,7 @@ class BoltzmannMachine(object):
                 minibatch_inds =\
                 perm_inds[self.batch_size*i:self.batch_size*(i+1)]
             
-                if self.algorithm =="CSS":
+                if "CSS" in self.algorithm:
                     
                    assert self.num_samples > 0 
                     
@@ -1924,8 +1924,7 @@ class BoltzmannMachine(object):
                       print((np.round(b_implicit,12) == np.round(b_explicit,12)).all())
                       sys.exit()
                     
-                   if ((self.mf_steps > 0) and (self.alpha >0)) or\
-                   ((not self.mixture) and self.gibbs_steps ==0): 
+                   if ((self.mf_steps > 0) and (self.alpha >0)): 
                        
                       if self.use_momentum:
                          
@@ -1981,7 +1980,7 @@ class BoltzmannMachine(object):
                                        is_probs,
                                        lrate_epoch)
                 
-                if "CD" in self.algorithm:
+                elif "CD" in self.algorithm:
            
                    if self.num_hidden ==0:
                         

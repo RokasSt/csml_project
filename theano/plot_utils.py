@@ -682,7 +682,7 @@ def process_err_dict(means_dict,
        return update_dict, regressor_values
 #######################################################################
 def generate_bar_plot(y_list,
-                      ordered_labels,
+                      labels,
                       save_to_path,
                       ylabel,
                       title = None,
@@ -695,9 +695,12 @@ def generate_bar_plot(y_list,
     
     x_axis   = np.arange(len(y_list))
     
-    for label_x in range(len(ordered_labels)):
+    for label_x in range(len(labels)):
         
-        ordered_labels[label_x] = r'\textbf{%s}'%ordered_labels[label_x]
+        if "_" in labels[label_x]:
+           labels[label_x] = labels[label_x].replace("_"," ")
+        
+        labels[label_x] = r'\textbf{%s}'%labels[label_x]
     
     if std_list != []:
               
@@ -719,7 +722,7 @@ def generate_bar_plot(y_list,
                                      
     ax.set_xticks(x_axis + width / 2)
            
-    ax.set_xticklabels(ordered_labels,
+    ax.set_xticklabels(labels,
                        rotation= "vertical",
                        fontsize = 14)
     
@@ -749,11 +752,14 @@ def display_recon_errors(array_dict,
     
     x_axis   = np.arange(num_exps)
     
-    ordered_labels = array_dict['LABELS']
+    labels = array_dict['LABELS']
     
-    for label_x in range(len(ordered_labels)):
+    for label_x in range(len(labels)):
         
-        ordered_labels[label_x] = r'\textbf{%s}'%ordered_labels[label_x]
+        if "_" in labels[label_x]:
+           labels[label_x] = labels[label_x].replace("_"," ")
+        
+        labels[label_x] = r'\textbf{%s}'%labels[label_x]
     
     plot_index =0
     
@@ -784,7 +790,7 @@ def display_recon_errors(array_dict,
                                      
            ax[plot_index].set_xticks(x_axis + width / 2)
            
-           ax[plot_index].set_xticklabels(ordered_labels,
+           ax[plot_index].set_xticklabels(labels,
                                           rotation= "vertical",
                                           fontsize = 14)
                                            

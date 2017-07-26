@@ -85,7 +85,7 @@ save_to_path = os.path.join(target_dir, "BAR_ENERGY_GAPS.jpeg")
 bar_title = "Difference between Data Term and Complementary Term"
 
 plot_utils.generate_bar_plot(y_list = list_of_means,
-                             ordered_labels = list_of_labels,
+                             labels = list_of_labels,
                              save_to_path = save_to_path,
                              ylabel = "Log (Difference)",
                              title = bar_title,
