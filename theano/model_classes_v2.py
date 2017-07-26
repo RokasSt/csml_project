@@ -68,7 +68,7 @@ class BoltzmannMachine(object):
         
         self.num_samples    = 0
         
-        self.num_cd_steps   = None
+        self.gibbs_steps    = 0
         
         self.resample       = False
         
@@ -96,9 +96,9 @@ class BoltzmannMachine(object):
                 
                   self.mf_steps = algorithm_dict[param]
                
-               if param == "num_cd_steps":
+               if param == "gibbs_steps":
                 
-                  self.num_cd_steps = algorithm_dict[param]
+                  self.gibbs_steps = algorithm_dict[param]
                
                if param == "num_samples":
                 
@@ -344,6 +344,13 @@ class BoltzmannMachine(object):
                                                name= "mf_hid_p", 
                                                borrow= True)
                                                
+           elif "CSS" in self.algorithm and self.gibbs_steps  > 0: 
+               
+              if self.num_hidden ==0: 
+                 self.x_gibbs= theano.shared(np.ones([self.batch_size,self.num_vars],
+                                             dtype=theano.config.floatX),
+                                             borrow = True, name= "x_gibbs") 
+             
     def set_mixture_means(self, inputs):
         
         """ function to set parameters of the mixture of Bernoulli products
@@ -477,11 +484,13 @@ class BoltzmannMachine(object):
         by uniform importance sampling or by product of bernoulli
         distributions under given vector of node probabilities."""
         
-        if (self.mf_steps == 0 or self.alpha ==0) and (not self.mixture):
+        if (self.mf_steps == 0 or self.alpha ==0) and (not self.mixture)\
+        and (self.gibbs_steps ==0):
            print("Importance distribution is uniform")
            weight_term = T.log(self.num_samples) + self.num_vars*T.log(0.5)
            
-        elif (self.mf_steps > 0 and self.alpha > 0) and (not self.mixture):
+        elif (self.mf_steps > 0 and self.alpha > 0) and (not self.mixture)\
+        and (self.gibbs_steps ==0):
            print("Importance distribution is not uniform")
            weight_term = T.log(self.num_samples)+\
            self.get_importance_evals(T.transpose(self.x_tilda), 
@@ -499,6 +508,16 @@ class BoltzmannMachine(object):
                        sequences = [T.arange(self.num_samples)])
            
            weight_term = T.log(self.num_samples) + weight_term
+           
+        elif self.gibbs_steps > 0:
+           print("Importance distribution is gibbs sampler") 
+           weight_term = T.log(self.num_samples)+\
+           self.get_importance_evals(T.transpose(self.x_tilda), 
+                                     T.transpose(self.sampler_theta))
+                                     
+           if self.resample:
+              weight_term = T.reshape(weight_term, 
+                                      [self.batch_size, self.num_samples])
         
         if self.resample and self.num_hidden ==0:
            
@@ -813,7 +832,7 @@ class BoltzmannMachine(object):
         if self.num_hidden == 0:
         
            (self.p_xi_given_x_, self.gibbs_samples), self.gibbs_updates =\
-           theano.scan(self.gibbs_step_fully_visible, n_steps = self.num_cd_steps)
+           theano.scan(self.gibbs_step_fully_visible, n_steps = self.gibbs_steps)
            
         if self.num_hidden > 0:
            
@@ -841,7 +860,7 @@ class BoltzmannMachine(object):
            ) = theano.scan(
             self.gibbs_step_rbm_hid,
             outputs_info=[None, None, None, None, None, init_chain],
-            n_steps= self.num_cd_steps)
+            n_steps= self.gibbs_steps)
             
            self.updates.update(updates)
             
@@ -984,10 +1003,11 @@ class BoltzmannMachine(object):
                         
            if (self.num_samples > 0) and (not self.mixture):
                
-              if ((self.mf_steps > 0) and self.alpha >0): 
+              if ((self.mf_steps > 0) and self.alpha >0) or\
+              self.gibbs_steps > 0: 
            
                  var_list.append(self.sampler_theta)
-           
+                 
         elif "CD" in self.algorithm:
             
            input_dict = {self.x  : self.train_inputs[self.minibatch_set,:]} 
@@ -1104,6 +1124,14 @@ class BoltzmannMachine(object):
         if "CSS" in self.algorithm and self.mf_steps > 0: 
         
            self.add_mf_updates()
+           
+        elif "CSS" in self.algorithm and self.gibbs_steps > 0:
+            
+           self.add_cd_samples()
+           
+           if self.num_hidden ==0:
+            
+              self.cd_sampling = self.get_cd_samples() 
            
         self.add_objective()
 
@@ -1671,7 +1699,10 @@ class BoltzmannMachine(object):
                           break
         return recon_images
     
-    def is_sampler(self, training = True, t = None):
+    def is_sampler(self, 
+                   training = True,
+                   minibatch_set = [],
+                   t = None):
         
         """ function to obtain samples from importance distribution """
         
@@ -1720,7 +1751,7 @@ class BoltzmannMachine(object):
                                                   p= p, 
                                                   size = shape_out) 
                    
-        elif (not self.mixture) and self.mf_steps==0:
+        elif (not self.mixture) and self.mf_steps==0 and self.gibbs_steps==0:
            
            p = 0.5
                  
@@ -1749,6 +1780,29 @@ class BoltzmannMachine(object):
                                                   p = p,
                                                   size = shape_out)
                                                   
+        elif self.gibbs_steps > 0 and minibatch_set !=[]:
+            
+           if self.resample:
+              print("Error: Resampling is not yet implemented with"+\
+              " gibbs sampling for CSS approximation")
+              sys.exit()
+          
+           p, is_samples = self.cd_sampling(minibatch_set)
+           
+           p = np.transpose(p)
+           is_samples = np.transpose(is_samples)
+           
+           if self.num_samples > self.batch_size:
+              
+              shape_out = (self.num_samples-self.batch_size, self.num_vars)
+              extra_samples = self.np_rand_gen.binomial(n = 1,
+                                                        p = 0.5,
+                                                        size = shape_out)
+                                                     
+              is_samples = np.vstack([is_samples, extra_samples])
+              
+              p = np.vstack([p, 0.5*np.ones(shape_out)])
+           
         return np.asarray(is_samples, dtype = theano.config.floatX), p
         
     def train_model(self, 
@@ -1837,7 +1891,9 @@ class BoltzmannMachine(object):
                     
                    assert self.num_samples > 0 
                     
-                   is_samples, is_probs = self.is_sampler(t = epoch_index)
+                   is_samples, is_probs =\
+                   self.is_sampler(t = epoch_index,
+                                   minibatch_set =list(minibatch_inds))
                    
                    is_samples = np.asarray(is_samples, 
                                            dtype = theano.config.floatX)
@@ -1869,7 +1925,7 @@ class BoltzmannMachine(object):
                       sys.exit()
                     
                    if ((self.mf_steps > 0) and (self.alpha >0)) or\
-                   (not self.mixture): 
+                   ((not self.mixture) and self.gibbs_steps ==0): 
                        
                       if self.use_momentum:
                          
@@ -1888,9 +1944,9 @@ class BoltzmannMachine(object):
                                        is_probs,
                                        lrate_epoch)
                                        
-                   elif (self.alpha ==0) or (self.mf_steps ==0) or\
-                   self.mixture:
-           
+                   elif ((self.alpha ==0) or (self.mf_steps ==0) or\
+                   self.mixture) and self.gibbs_steps ==0:
+                      
                       if self.use_momentum:
                           
                          approx_cost, p_tilda =\
@@ -1904,7 +1960,26 @@ class BoltzmannMachine(object):
                          approx_cost, p_tilda =\
                          self.optimize(is_samples, 
                                        list(minibatch_inds),
-                                       lrate_epoch) 
+                                       lrate_epoch)
+                                       
+                   elif self.gibbs_steps > 0:
+                      
+                      if self.use_momentum:
+                          
+                         approx_cost, p_tilda =\
+                         self.optimize(is_samples, 
+                                       list(minibatch_inds),
+                                       is_probs,
+                                       lrate_epoch,
+                                       momentum_epoch)
+              
+                      elif (not self.use_momentum):
+                          
+                         approx_cost, p_tilda =\
+                         self.optimize(is_samples, 
+                                       list(minibatch_inds),
+                                       is_probs,
+                                       lrate_epoch)
                 
                 if "CD" in self.algorithm:
            

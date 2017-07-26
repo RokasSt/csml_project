@@ -74,14 +74,14 @@ def compare_algorithms(params ={'num_runs': 20,
                        'exp2':{'algorithm'     : 'CD1',
                                'algorithm_dict':
                                    {
-                                        'num_cd_steps':1,
+                                        'gibbs_steps':1,
                                     },
                                'report_p_tilda': False,
                                'regressor': None},
                        'exp3':{'algorithm'     : 'PCD1',
                                'algorithm_dict':
                                    {
-                                        'num_cd_steps':1,
+                                        'gibbs_steps':1,
                                     },
                                'report_p_tilda': False,
                                'regressor':None}
@@ -547,12 +547,12 @@ if __name__ == "__main__":
    
    exps ={'exp1':{'algorithm' : 'CSS',
                   'algorithm_dict':
-                          {
-                           'num_samples'   : 500, #[10, 50, 100],#[10, 50, 100, 300, 500],
+                          {#500, #[10, 50, 100],#[10, 50, 100, 300, 500],
+                           'num_samples'   : [10, 60],
                            'resample'      : False,  
                            'alpha'         : None, #0.01, # 0.05;
                            'uniform_to_mf' : False,
-                           'mixture'       : True,
+                           'mixture'       : False,
                            'mix_params'    : np.array([[0.001, 0.998],
                                                        [0.2,   0.0],
                                                        [0.1,   0.0],
@@ -560,30 +560,44 @@ if __name__ == "__main__":
                                                        [0.1,   0.8],
                                                        [0.01,  0.98]]),
                            'mf_steps'      : 0, #50,
+                           'gibbs_steps'   : 1,
                            },
                   'report_p_tilda': True,
-                  'regressor': None, #'num_samples'
+                  'regressor': 'num_samples'
                   },
           'exp2':{'algorithm'     : 'CD1',
                   'algorithm_dict':
                     {
-                      'num_cd_steps':1,
+                      'gibbs_steps':1,
                      },
                   'report_p_tilda': False,
                   'regressor': None},
           'exp3':{'algorithm': 'PCD1',
                   'algorithm_dict':
                     {
-                        'num_cd_steps':1,
+                        'gibbs_steps':1,
                      },
                   'report_p_tilda': False,
-                  'regressor':None}
-                       }
+                  'regressor':None},
+          'exp4':{'algorithm' : 'CSS',
+                  'algorithm_dict':
+                          {
+                           'num_samples'   : [50],
+                           'resample'      : False,  
+                           'alpha'         : None,
+                           'uniform_to_mf' : False,
+                           'mixture'       : False,
+                           'mf_steps'      : 0, 
+                           'gibbs_steps'   : 0,
+                           },
+                  'report_p_tilda': True,
+                  'regressor': 'num_samples'
+                  },            }
                        
-   del exps['exp2'] #  uncomment for testing CSS specifically
-   del exps['exp3']
+   #del exps['exp2'] #  uncomment for testing CSS specifically
+   #del exps['exp3']
    
-   params ={'num_runs': 1, #40,
+   params ={'num_runs': 40, #40,
             'N_train' : all_train_images.shape[0],
             'D': all_train_images.shape[1],
             'use_gpu': False,
@@ -610,7 +624,7 @@ if __name__ == "__main__":
    
    compare_algorithms(params = params,
                       exps = exps,
-                      experiment_id = "MIXTURE_TEST_NS500")
+                      experiment_id = "IS_GIBBS_NR40")
    
    
 
