@@ -15,6 +15,7 @@ import matplotlib
 matplotlib.use('agg',warn=False, force=True)
 from matplotlib import pyplot as plt
 import scipy.io
+import json
 
 def energy_function(W, b, x):
     

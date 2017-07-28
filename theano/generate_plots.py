@@ -30,6 +30,8 @@ arg_parser.add_argument('--algorithm_specific', type=str,required= False)
 
 arg_parser.add_argument('--include_paths_with', type=str,required= False)
 
+arg_parser.add_argument('--css_gibbs', type=str,required= False)
+
 FLAGS, _    = arg_parser.parse_known_args()
 
 target_dir  = FLAGS.target_dir
@@ -57,6 +59,14 @@ if FLAGS.avg_p_tilda != None:
 else:
     
    avg_p_tilda = False
+   
+if FLAGS.css_gibbs != None:
+    
+   css_gibbs = bool(int(FLAGS.css_gibbs))
+   
+else:
+    
+   css_gibbs = False
 
 regressor_name     = FLAGS.regressor_name
 
@@ -103,19 +113,30 @@ else:
 if __name__ == "__main__":
    if avg_w_norms:
       print("Will generate plots of w norms averaged over multiple runs")
+      target_dict = {"CSS":"W_NORMS.dat",
+                     "PCD1":"W_NORMS.dat",
+                     "CD1": "W_NORMS.dat"}
+                     
+      xlabel_dict = {"CSS":'Iteration number',
+                     "PCD1":'Iteration number',
+                     "CD1":'Iteration number'}
+                     
+      ylabel_dict = {"CSS":'L2-norm on W',
+                     "PCD1":'L2-norm on W',
+                     "CD1" :'L2-norm on W'}               
+      
+      if css_gibbs:
+         target_dict["CSS_GIBBS"] = "W_NORMS.dat" 
+         xlabel_dict["CSS_GIBBS"] = 'Iteration number'
+         ylabel_dict["CSS_GIBBS"] = "L2-norm on W"
+         del target_dict["CSS"] 
+         del xlabel_dict["CSS"]
+         del ylabel_dict["CSS"]
+         
       plot_utils.plot_temporal_data(list_target_dirs = all_target_dirs,
-                                    target_dict = {"CSS":"W_NORMS.dat",
-                                                   "PCD1":"W_NORMS.dat",
-                                                   "CD1": "W_NORMS.dat",
-                                                   },
-                                    xlabel_dict = {"CSS":'Iteration number',
-                                                   "PCD1":'Iteration number',
-                                                   "CD1":'Iteration number',
-                                                   },
-                                    ylabel_dict = {"CSS":'L2-norm on W',
-                                                   "PCD1":'L2-norm on W',
-                                                   "CD1" :'L2-norm on W',
-                                                   },
+                                    target_dict = target_dict,
+                                    xlabel_dict = xlabel_dict,
+                                    ylabel_dict = ylabel_dict,
                                     file_name        = "MEAN_W_NORMS",
                                     param_dict_name  = "PARAMETERS.json",
                                     regressor        = regressor_name,
@@ -125,9 +146,13 @@ if __name__ == "__main__":
                        
    if avg_recon_errors:
       print("Will generate plots of reconstruction errors")
+      list_experiments = ["CSS", "PCD1", "CD1"]
+      if css_gibbs:
+         list_experiments.append("CSS_GIBBS")
+         del list_experiments[0]
       
       plot_utils.plot_recon_errors(list_target_dirs = all_target_dirs,
-                                   list_experiments = ["CSS", "PCD1", "CD1"],
+                                   list_experiments = list_experiments,
                                    param_dict_name  = "PARAMETERS.json",
                                    regressor        = regressor_name,
                                    algorithm_spec   = algorithm_specific,
@@ -136,26 +161,40 @@ if __name__ == "__main__":
    if avg_p_tilda:
       print("Will generate plots of p tilda values during training time"+\
       " averaged over training points")
+      target_dict = {"CSS":"TRAIN_P_TILDA.dat",
+                     "PCD1":"TRAIN_PSEUDO_LOSSES.dat",
+                     "CD1" :"TRAIN_PSEUDO_LOSSES.dat"}
+                     
+      xlabel_dict = {"CSS":'Iteration number',
+                     "PCD1":'Iteration number',
+                     "CD1" :'Iteration number'}
+                     
+      ylabel_dict = {"CSS":'P tilda',
+                     "PCD1":'Pseudo Likelihood',
+                     "CD1" :'Pseudo Likelihood'}
+                     
+      end_values_dict = {"CSS":'P tilda'}
+      
+      if css_gibbs:
+         target_dict["CSS_GIBBS"]     = "TRAIN_P_TILDA.dat"
+         xlabel_dict["CSS_GIBBS"]     = "Iteration number"
+         ylabel_dict["CSS_GIBBS"]     = "P tilda"
+         end_values_dict["CSS_GIBBS"] = "P tilda"
+         del target_dict["CSS"]
+         del xlabel_dict["CSS"]
+         del ylabel_dict["CSS"]
+         del end_values_dict["CSS"]
       
       plot_utils.plot_temporal_data(list_target_dirs = all_target_dirs,
-                                    target_dict = {"CSS":"TRAIN_P_TILDA.dat",
-                                                   "PCD1":"TRAIN_PSEUDO_LOSSES.dat",
-                                                   "CD1" :"TRAIN_PSEUDO_LOSSES.dat",
-                                                   },
-                                    xlabel_dict = {"CSS":'Iteration number',
-                                                   "PCD1":'Iteration number',
-                                                   "CD1" :'Iteration number',
-                                                   },
-                                    ylabel_dict = {"CSS":'P tilda',
-                                                   "PCD1":'Pseudo Likelihood',
-                                                   "CD1" :'Pseudo Likelihood',
-                                                   },
+                                    target_dict = target_dict,
+                                    xlabel_dict = xlabel_dict,
+                                    ylabel_dict = ylabel_dict,
                                     file_name        = "LEARNING_CURVES",
                                     param_dict_name  = "PARAMETERS.json",
                                     regressor        = regressor_name,
                                     algorithm_spec   = algorithm_specific,
                                     average_over_axis= 1,
-                                    end_values_dict  = {"CSS":'P tilda'},
+                                    end_values_dict  = end_values_dict,
                                     error_bars       = False)
       
       

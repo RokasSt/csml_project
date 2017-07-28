@@ -526,8 +526,9 @@ def process_dict_to_list(target_dict):
         
     return output_dict
  
-def process_err_dict(means_dict, 
-                     std_dict =[], 
+def process_err_dict(means_dict,
+                     target_fields,
+                     std_dict =[],
                      update_dict = None, 
                      bar_plots = True):
     
@@ -550,6 +551,9 @@ def process_err_dict(means_dict,
        output_dict['NOISY']['STD']      = []
 
        for alg in means_dict.keys():
+           
+           if alg not in target_fields:
+              continue
            
            if (not isinstance(means_dict[alg]['MISSING'], dict)) and\
            (not isinstance(means_dict[alg]['NOISY'], dict)):
@@ -608,6 +612,9 @@ def process_err_dict(means_dict,
           update_dict['MISSING'] = {}
           
           for alg in means_dict.keys():
+              
+              if alg not in target_fields:
+                 continue
           
               update_dict['NOISY'][alg]   = {}
           
@@ -621,7 +628,10 @@ def process_err_dict(means_dict,
           
               update_dict['MISSING'][alg]['STD']  = []
               
-       for alg in means_dict.keys():   
+       for alg in means_dict.keys():  
+           
+           if alg not in target_fields:
+              continue
            
            if not isinstance(means_dict[alg]['MISSING'], dict):
                
@@ -929,6 +939,10 @@ def plot_regressions(y_dict,
             if min_val_check < min_val:
                 
                min_val = min_val_check
+               
+            label = alg
+            if "_" in label:
+               label = label.replace("_"," ") 
             
             if plot_std:
                std_y_values = np.array(y_dict[exp_type][alg]['STD'])
@@ -936,13 +950,13 @@ def plot_regressions(y_dict,
                ax[plot_index].errorbar(x_values,
                                        y_values,
                                        yerr  = std_y_values,
-                                       label = r"\textbf{%s}"%alg,
+                                       label = r"\textbf{%s}"%label,
                                        linewidth = 2)
             else:
             
                ax[plot_index].plot(x_values, 
                                    y_values,
-                                   label =r"\textbf{%s}"%alg,
+                                   label =r"\textbf{%s}"%label,
                                    linewidth = 2)
         
         ax[plot_index].set_xlabel(r'\textbf{%s}'%x_label, fontsize=15)
@@ -1339,6 +1353,7 @@ def plot_recon_errors(list_target_dirs,
         if regressor == None:
             
            dict_of_lists = process_err_dict(means_dict,
+                                            list_experiments,
                                             std_dict,
                                             bar_plots = True)
             
@@ -1355,6 +1370,7 @@ def plot_recon_errors(list_target_dirs,
             
            dict_to_update, found_reg_list =\
            process_err_dict(means_dict,
+                            list_experiments,
                             std_dict,
                             dict_to_update,
                             bar_plots = False)
