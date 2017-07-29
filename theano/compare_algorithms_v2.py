@@ -292,26 +292,22 @@ def compare_algorithms(params ={'num_runs': 20,
         run_path = os.path.join(root_path, "run%d"%run_index)
 
         os.makedirs(run_path)
-    
+        
         if select_images:
-           
            if params['equal_per_classes']:
               
               train_images = utils.select_subset(class_files, 
                                              n = params['num_to_learn']//10,
                                              D = params['D'])
                
-              #inds=np.asarray([1000, 6000, 13000, 20000, 27000,\
-              #32000, 38000, 44000, 52000, 59003])
-              #train_images = train_data_inputs[inds,:]
-              
            else:
        
               train_inds = np.random.choice(range(params['N_train']), 
-                                        params['num_to_learn'], 
-                                        replace=False)
+                                            params['num_to_learn'], 
+                                            replace=False)
                                         
-              np.savetxt(os.path.join(run_path,"LEARNT_INSTANCES.dat"), train_inds)
+              np.savetxt(os.path.join(run_path,"LEARNT_INSTANCES.dat"), 
+                         train_inds)
                                     
               train_images = train_data_inputs[train_inds,:]
           
@@ -336,8 +332,8 @@ def compare_algorithms(params ={'num_runs': 20,
            else:
        
               reconst_inds = np.random.choice(range(params['N_train']), 
-                                            params['num_to_reconstruct'], 
-                                            replace=False)
+                                              params['num_to_reconstruct'], 
+                                              replace=False)
                                             
               imgs_to_reconstruct = train_data_inputs[reconst_inds,:]
            
@@ -365,7 +361,7 @@ def compare_algorithms(params ={'num_runs': 20,
         reconst_dict= {}
         w_norms_all = {}
         
-        reconst_dict['NOISY'] = {}
+        reconst_dict['NOISY']   = {}
         reconst_dict['MISSING'] = {}
         
         for tag in exps.keys():
@@ -529,8 +525,11 @@ def compare_algorithms(params ={'num_runs': 20,
     with open(file_to_open, 'w') as json_file:
     
          json.dump(std_errors, json_file)
+    
+    look_at = avg_errors.keys()
      
     dict_of_lists = plot_utils.process_err_dict(means_dict = avg_errors,
+                                                target_fields = look_at,
                                                 std_dict = std_errors,
                                                 bar_plots = True)
     
@@ -553,7 +552,7 @@ if __name__ == "__main__":
    exps ={'exp1':{'algorithm'     : 'CSS_GIBBS',
                   'algorithm_dict':
                           {#500, #[10, 50, 100],#[10, 50, 100, 300, 500],
-                           'num_samples'   : [10, 60],
+                           'num_samples'   : [90],
                            'resample'      : False,  
                            'alpha'         : None, #0.01, # 0.05;
                            'uniform_to_mf' : False,
@@ -568,7 +567,7 @@ if __name__ == "__main__":
                            'gibbs_steps'   : 1,
                            },
                   'report_p_tilda': True,
-                  'regressor': 'num_samples'
+                  'regressor': 'num_samples',
                   },
           'exp2':{'algorithm'     : 'CD1',
                   'algorithm_dict':
@@ -599,8 +598,9 @@ if __name__ == "__main__":
                   'regressor': 'num_samples',
                   },            }
                        
-   #del exps['exp2'] #  uncomment for testing CSS specifically
-   #del exps['exp3']
+   #del exps['exp2'] #  uncomment for testing specific algorithm
+   del exps['exp3']
+   del exps['exp4']
    
    params ={'num_runs': 40,
             'N_train' : all_train_images.shape[0],
@@ -629,7 +629,7 @@ if __name__ == "__main__":
    
    compare_algorithms(params = params,
                       exps = exps,
-                      experiment_id = "IS_GIBBS_NR40")
+                      experiment_id = "CSS_NS90_NR40")
    
    
 
