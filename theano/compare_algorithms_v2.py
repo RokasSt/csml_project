@@ -552,7 +552,7 @@ if __name__ == "__main__":
    exps ={'exp1':{'algorithm'     : 'CSS_GIBBS',
                   'algorithm_dict':
                           {#500, #[10, 50, 100],#[10, 50, 100, 300, 500],
-                           'num_samples'   : [90],
+                           'num_samples'   : [60],
                            'resample'      : False,  
                            'alpha'         : None, #0.01, # 0.05;
                            'uniform_to_mf' : False,
@@ -598,7 +598,7 @@ if __name__ == "__main__":
                   'regressor': 'num_samples',
                   },            }
                        
-   #del exps['exp2'] #  uncomment for testing specific algorithm
+   del exps['exp2'] #  uncomment for testing specific algorithm
    del exps['exp3']
    del exps['exp4']
    
@@ -629,7 +629,7 @@ if __name__ == "__main__":
    
    compare_algorithms(params = params,
                       exps = exps,
-                      experiment_id = "CSS_NS90_NR40")
+                      experiment_id = "GIBBS_NS30_U_NS30_NR40")
    
    
 

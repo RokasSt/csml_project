@@ -509,6 +509,11 @@ class BoltzmannMachine(object):
            
            weight_term = T.log(self.num_samples) + weight_term
            
+           if self.resample:
+              print("Error: Resampling is not yet implemented with"+\
+              " mixture of Bernoulli products")
+              sys.exit()
+           
         elif self.gibbs_steps > 0:
            print("Importance distribution is gibbs sampler") 
            weight_term = T.log(self.num_samples)+\
@@ -516,9 +521,10 @@ class BoltzmannMachine(object):
                                      T.transpose(self.sampler_theta))
                                      
            if self.resample:
-              weight_term = T.reshape(weight_term, 
-                                      [self.batch_size, self.num_samples])
-        
+              print("Error: Resampling is not yet implemented with"+\
+              " gibbs sampling for CSS approximation")
+              sys.exit() 
+              
         if self.resample and self.num_hidden ==0:
            
            approx_Z = -self.compute_energy(self.x_tilda, 
@@ -1771,38 +1777,64 @@ class BoltzmannMachine(object):
               
               p  = get_means[comp_inds,:]
            
-           else:
-              print("Error: Resampling is not yet implemented with"+\
-              " mixture of Bernoulli products")
-              sys.exit()
-           
            is_samples = self.np_rand_gen.binomial(n = 1,
                                                   p = p,
                                                   size = shape_out)
                                                   
         elif self.gibbs_steps > 0 and minibatch_set !=[]:
+           
+           target_inds = minibatch_set
             
-           if self.resample:
-              print("Error: Resampling is not yet implemented with"+\
-              " gibbs sampling for CSS approximation")
-              sys.exit()
-          
-           p, is_samples = self.cd_sampling(minibatch_set)
+           p, is_samples = self.cd_sampling(target_inds)
            
            p = np.transpose(p)
            is_samples = np.transpose(is_samples)
            
+           p_minibatch = np.copy(p)
+           
+           num_u = self.num_samples // 2
+           
            if self.num_samples > self.batch_size:
               
-              shape_out = (self.num_samples-self.batch_size, self.num_vars)
+              num_s = self.num_samples - self.batch_size - num_u
+              
+              if num_s > self.batch_size:
+              
+                 for i in range(num_s // self.batch_size):
+                  
+                     shape_out = (self.batch_size, self.num_vars)
+                  
+                     is_samples_new =\
+                     self.np_rand_gen.binomial(n = 1,
+                                               p = p_minibatch,
+                                               size = shape_out)
+                  
+                     is_samples = np.vstack([is_samples, is_samples_new])
+              
+                     p = np.vstack([p, p_minibatch])
+                  
+              shape_out = (num_u, self.num_vars)
+              
               extra_samples = self.np_rand_gen.binomial(n = 1,
                                                         p = 0.5,
                                                         size = shape_out)
-                                                     
+                                                        
               is_samples = np.vstack([is_samples, extra_samples])
               
               p = np.vstack([p, 0.5*np.ones(shape_out)])
-           
+              
+           # old implementation with uniform importance sampling
+           #if self.num_samples > self.batch_size:
+              
+              #shape_out = (self.num_samples-self.batch_size, self.num_vars)
+              #extra_samples = self.np_rand_gen.binomial(n = 1,
+                                                       # p = 0.5,
+                                                       # size = shape_out)
+                                                     
+              #is_samples = np.vstack([is_samples, extra_samples])
+              
+              #p = np.vstack([p, 0.5*np.ones(shape_out)])
+              
         return np.asarray(is_samples, dtype = theano.config.floatX), p
         
     def train_model(self, 
