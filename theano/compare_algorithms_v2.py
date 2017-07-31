@@ -1,7 +1,7 @@
 """ 
 Author: Rokas Stanislovas
-MSc Project: Likelihood Approximations
-for Energy-Based Models
+MSc Project: Complementary Sum Sampling 
+for Learning in Boltzmann Machines
 MSc Computational Statistics and 
 Machine Learning
 """
@@ -23,7 +23,11 @@ import plot_utils
 import copy
 
 print("Importing data ...")
-all_train_images, all_train_labels = utils.get_data_arrays()
+all_images, all_labels = utils.get_data_arrays()
+
+all_train_images = all_images
+
+all_train_labels = all_labels
     
 def compare_algorithms(params ={'num_runs': 20,
                                 'N_train' : all_train_images.shape[0],
@@ -201,6 +205,9 @@ def compare_algorithms(params ={'num_runs': 20,
     elif params['num_hidden'] == 0 and params['init_type'] == "ZEROS":
     
        W0 = np.zeros([params['D'], params['D']])
+       
+    if params['num_hidden']:
+       W0 = (W0 + np.transpose(W0))/2.0
                     
     W0 = np.asarray(W0, dtype = theano.config.floatX) 
 
@@ -598,7 +605,7 @@ if __name__ == "__main__":
                   'regressor': 'num_samples',
                   },            }
                        
-   del exps['exp2'] #  uncomment for testing specific algorithm
+   #del exps['exp2'] #  uncomment for testing specific algorithm
    del exps['exp3']
    del exps['exp4']
    

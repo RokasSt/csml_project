@@ -1,7 +1,7 @@
 """ 
 Author: Rokas Stanislovas
-MSc Project: Likelihood Approximations
-for Energy-Based Models
+MSc Project: Complementary Sum Sampling 
+for Learning in Boltzmann Machines
 MSc Computational Statistics and 
 Machine Learning
 """
@@ -12,8 +12,6 @@ import shutil
 import os
 import sys
 import json
-import tensorflow as tf
-from   tensorflow.examples.tutorials.mnist import input_data
 import matplotlib
 matplotlib.use('agg',warn=False, force=True)
 from matplotlib import pyplot as plt
@@ -21,154 +19,201 @@ import theano
 import theano.tensor as T
 import datetime
 import utils
+import plot_utils
 import argparse
 import timeit
 import os
-from   model_classes import BoltzmannMachine
-
+from   model_classes_v2 import BoltzmannMachine
 
 np_rand_gen = np.random.RandomState(1234)
 
-mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+N_train        = 60000
 
-test_images      = np.round(mnist.test.images)
+num_to_plot    = 10
 
-test_labels      = mnist.test.labels
+num_to_reconst = 10
 
-train_images     = np.round(mnist.train.images)
+pflip          = 0.2
 
-train_labels     = mnist.train.labels
+pmiss          = 0.9
 
-num_train_images = train_images.shape[0]
+num_iters      = 10
 
-D                = train_images.shape[1]
+assert num_to_reconst >= num_to_plot
+
+print("Importing data ...")
+all_images, all_labels = utils.get_data_arrays()
+
+test_images    = all_images[N_train:,:]
+
+test_labels    = all_labels[N_train:,:]
+
+train_images   = all_images[0:N_train,:]
+
+train_labels   = all_labels[0:N_train,:]
+
+D              = all_images.shape[1]
 
 assert D == 784
 
-validate_images  = np.round(mnist.validation.images)
+arg_parser     = argparse.ArgumentParser()
 
-validate_labels  = mnist.validation.labels
+arg_parser.add_argument('--target_dir', type=str,required= True)
 
-arg_parser       = argparse.ArgumentParser()
+arg_parser.add_argument('--use_train_set', type=str,required= True)
 
-arg_parser.add_argument('--path_to_params', type=str,required= True)
+arg_parser.add_argument('--algorithm', type=str,required= False)
 
-arg_parser.add_argument('--num_iters', type=str,required= True)
+FLAGS, _       = arg_parser.parse_known_args()
 
-arg_parser.add_argument('--num_reconstruct', type=str,required= True)
+target_dir     = FLAGS.target_dir
 
-arg_parser.add_argument('--trained_subset', type = str, required = True)
+use_train_set  = bool(int(FLAGS.use_train_set))
 
-arg_parser.add_argument('--test_mode', type = str, required = False)
+split_path     = os.path.split(target_dir)
 
-FLAGS, _          = arg_parser.parse_known_args()
+found_images   = False
 
-path_to_params    = FLAGS.path_to_params
+images_file    = "TRAIN_IMAGES.dat"
 
-num_iters         = int(FLAGS.num_iters)
+params_file    = "PARAMETERS.json"
 
-num_reconstruct   = int(FLAGS.num_reconstruct)
+if use_train_set:
+   print("Will run reconstruction tasks on the training set")
+   for item in os.listdir(target_dir):
+       if item == images_file:
+          found_images = True
+          break
+       
+   if  found_images:
+       print("Found %s"%images_file)
+       test_inputs = np.loadtxt(os.path.join(target_dir, images_file))
+       
+   else:
+       test_inputs = train_images
+else:
+   print("Will run reconstruction tasks on the test set") 
+   test_inputs    = test_images
 
-trained_subset    = int(FLAGS.trained_subset)
+num_inputs        = test_inputs.shape[0]
 
-if FLAGS.test_mode != None:
+split_root_path   = target_dir.split("/run")
 
-   test_mode      = bool(int(FLAGS.test_mode))
+root_root_path    = split_root_path[0]
+
+check_params_file = os.path.join(root_root_path, params_file)
+
+if num_inputs > num_to_reconst:
    
+   inds_to_reconst = np.random.choice(num_inputs, 
+                                      num_to_reconst, 
+                                      replace = False)
+                                   
 else:
     
-   test_mode = False
+   inds_to_reconst  = np.array(range(num_to_reconst))
    
-if "RH" in path_to_params:
-
-   ind0 = path_to_params.find("RH")
-   ind1 = path_to_params.find("LR")
-   num_hidden = int(path_to_params[ind0+2:ind1])
+if num_to_reconst > num_to_plot:
    
+   inds_to_plot = np.random.choice(range(len(inds_to_reconst)), 
+                                   num_to_plot, 
+                                   replace = False)
+                                   
 else:
+    
+   inds_to_plot  = np.array(range(len(inds_to_reconst)))
+   
+test_inputs = test_inputs[inds_to_reconst,:]
+                                   
+if "RH" in target_dir:
+
+   ind0 = target_dir.find("RH")
+   ind1 = target_dir.find("LR")
+   num_hidden = int(target_dir[ind0+2:ind1])
+   
+elif "RH" not in target_dir:
     
    num_hidden = 0
+   
+   if os.path.exists(check_params_file):
+      print("%s exists"%check_params_file)
+      with open(check_params_file, 'r') as json_file:
+           param_dict = json.load(json_file) 
+           
+      num_hidden = param_dict['GLOBAL']['num_hidden']
 
-split_path        = os.path.split(path_to_params)
-
-if bool(trained_subset):
+bm = BoltzmannMachine(num_vars    = D, 
+                      num_hidden  = num_hidden,
+                      training    = False)
+                      
+if isinstance(FLAGS.algorithm, str):
     
-   indices =np.loadtxt(os.path.join(split_path[0],"LEARNT_INSTANCES.dat"))
-   
-   indices = np.array(indices, dtype = np.int64)
-   
-   test_inputs = train_images[indices,:]
-   
-   if indices.size ==1:
-       
-      test_inputs = np.reshape(test_inputs,[1,D])
-       
-      num_reconstruct = 1
-      
-      num_test        = 1
+   path_to_params = os.path.join(target_dir, FLAGS.algorithm)
    
 else:
     
-   test_inputs = test_images
-   
-   num_test = test_inputs.shape[0]
-
-if num_test > num_reconstruct:
-    
-   select_inputs = np.random.choice(num_test, 
-                                    num_reconstruct, 
-                                    replace = False)
-   
-   test_inputs = test_inputs[select_inputs,:]
-   
-elif num_test < num_reconstruct:
-    
-   num_reconstruct = num_test
-
-bm = BoltzmannMachine(num_vars        = D, 
-                      num_hidden      = num_hidden,
-                      training        = False)
+   path_to_params = target_dir
+                      
+path_to_params = os.path.join(path_to_params,"TRAINED_PARAMS_END.model")
       
 bm.load_model_params(full_path = path_to_params)
 
+mean_values = {}
+
+std_values  = {}
+
 ###### reconstruction of missing pixels
-filename = "RECONST_MISSING"
+
+curr_time = datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" )
+
+filename = "RECONST_MISSING_%s"%curr_time
 
 save_to_path = os.path.join(split_path[0],filename+".jpeg")
 
-which_pixels = utils.select_missing_pixels(gamma = 0.5, 
-                                           D= D, 
-                                           N= num_reconstruct)
+which_pixels = utils.get_missing_pixels(gamma = pmiss, 
+                                        D     = D, 
+                                        N     = num_to_reconst)
 
 images_to_reconst = np.copy(test_inputs)
 blocked_images    = np.copy(test_inputs)
 images_to_reconst[which_pixels] =  1
-blocked_images[which_pixels]    = -1
+blocked_images[which_pixels]    =  0.5 #-1
 
-images_to_reconst = bm.reconstruct_missing(num_iters = num_iters, 
+images_to_reconst = bm.reconstruct_missing(num_iters    = num_iters, 
                                            recon_images = images_to_reconst, 
-                                           which_pixels = which_pixels,
-                                           test_mode = test_mode)
+                                           which_pixels = which_pixels)
                                                                             
-recon_errors= utils.plot_reconstructions(test_inputs,
-                                         blocked_images,
-                                         images_to_reconst,
-                                         save_to_path)
+plot_utils.plot_reconstructions(test_inputs[inds_to_plot,:],
+                                blocked_images[inds_to_plot,:],
+                                images_to_reconst[inds_to_plot,:],
+                                save_to_path)
                                          
-np.savetxt(os.path.join(split_path[0],"%s_ERRORS.dat"%filename), 
-           recon_errors)
+recon_errors = np.zeros(num_to_reconst)
+           
+for xi in range(num_to_reconst):
+    
+    recon_errors[xi] =\
+    utils.hamming_distance(test_inputs[xi,:], 
+                           images_to_reconst[xi,:])
+
+np.savetxt(os.path.join(target_dir,"%s_ERRORS.dat"%filename), recon_errors)
+
+mean_val = np.mean(recon_errors)
+
+std_val  = np.std(recon_errors)
+
+mean_values['MISSING'] = mean_val
+
+std_values['MISSING']  = std_val
 
 ############### reconstruction of noisy data
+filename = "RECONST_NOISY_%s"%curr_time
 
-pflip = 0.1
+save_to_path = os.path.join(target_dir,filename+".jpeg")
 
-filename = "RECONST_NOISY"
-
-save_to_path = os.path.join(split_path[0],filename+".jpeg")
-
-which_pixels = utils.select_noisy_pixels(pflip = pflip, 
-                                         D     = D, 
-                                         N     = num_reconstruct)
+which_pixels = utils.get_noisy_pixels(pflip = pflip, 
+                                      D     = D, 
+                                      N     = num_to_reconst)
                                          
 noisy_images = np.copy(test_inputs)
 
@@ -176,19 +221,53 @@ noisy_images[which_pixels] = 1- noisy_images[which_pixels]
 
 images_to_reconst= np.copy(noisy_images)
 
-images_to_reconst = bm.reconstruct_noisy(num_iters    = num_iters, 
+images_to_reconst = bm.reconstruct_noisy(num_iters      = num_iters, 
                                          correct_images = test_inputs,
-                                         recon_images = images_to_reconst, 
-                                         noisy_images = noisy_images,
-                                         pflip        = pflip)
+                                         recon_images   = images_to_reconst, 
+                                         noisy_images   = noisy_images,
+                                         pflip          = pflip)
                                                 
-recon_errors= utils.plot_reconstructions(test_inputs,
-                                         noisy_images,
-                                         images_to_reconst,
-                                         save_to_path)
+plot_utils.plot_reconstructions(test_inputs[inds_to_plot,:],
+                                noisy_images[inds_to_plot,:],
+                                images_to_reconst[inds_to_plot,:],
+                                save_to_path)
+                        
+recon_errors = np.zeros(num_to_reconst)
+           
+for xi in range(num_to_reconst):
+    
+    recon_errors[xi] =\
+    utils.hamming_distance(test_inputs[xi,:], 
+                           images_to_reconst[xi,:])
                                          
-np.savetxt(os.path.join(split_path[0],"%s_ERRORS.dat"%filename), 
-           recon_errors)
+np.savetxt(os.path.join(target_dir,"%s_ERRORS.dat"%filename), recon_errors)
+
+mean_val = np.mean(recon_errors)
+
+std_val  = np.std(recon_errors)
+
+mean_values['NOISY'] = mean_val
+
+std_values['NOISY']  = std_val
+
+save_means_to = os.path.join(target_dir,"MEAN_ERRORS_%s.json"%curr_time)
+
+save_std_to   = os.path.join(target_dir,"STD_ERRORS_%s.json"%curr_time)
+
+with open(save_means_to, 'w') as json_file:
+
+     json.dump(mean_values, json_file)
+     
+with open(save_std_to, 'w') as json_file:
+
+     json.dump(std_values, json_file)
+     
+print("Mean errors for reconstruction tasks:")
+print(mean_values)
+
+print("Standard deviations for reconstruction tasks:")
+print(std_values)
+
 
 
 

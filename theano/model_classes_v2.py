@@ -1,7 +1,7 @@
 """ 
 Author: Rokas Stanislovas
-MSc Project: Likelihood Approximations
-for Energy-Based Models
+MSc Project: Complementary Sum Sampling 
+for Learning in Boltzmann Machines
 MSc Computational Statistics and 
 Machine Learning
 """
@@ -1824,6 +1824,8 @@ class BoltzmannMachine(object):
               p = np.vstack([p, 0.5*np.ones(shape_out)])
               
            # old implementation with uniform importance sampling
+           # all extra samples are obtained with uniform importance sampling
+           # a single local approximation is made for each minibatch point
            #if self.num_samples > self.batch_size:
               
               #shape_out = (self.num_samples-self.batch_size, self.num_vars)
