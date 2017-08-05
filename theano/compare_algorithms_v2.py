@@ -559,8 +559,8 @@ if __name__ == "__main__":
    exps ={'exp1':{'algorithm'     : 'CSS_GIBBS',
                   'algorithm_dict':
                           {#500, #[10, 50, 100],#[10, 50, 100, 300, 500],
-                           'num_samples'   : [60],
-                           'resample'      : False,  
+                           'num_samples'   : [10], # 40
+                           'resample'      : True,  
                            'alpha'         : None, #0.01, # 0.05;
                            'uniform_to_mf' : False,
                            'mixture'       : False,
@@ -636,7 +636,7 @@ if __name__ == "__main__":
    
    compare_algorithms(params = params,
                       exps = exps,
-                      experiment_id = "GIBBS_NS30_U_NS30_NR40")
+                      experiment_id = "GIBBS_RS1_NS10_NR40")
    
    
 

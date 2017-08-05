@@ -25,13 +25,13 @@ import timeit
 import os
 from   model_classes_v2 import BoltzmannMachine
 
-np_rand_gen = np.random.RandomState(1234)
+np_rand_gen    = np.random.RandomState(1234)
 
 N_train        = 60000
 
-num_to_plot    = 10
+num_to_plot    = 20
 
-num_to_reconst = 10
+num_to_reconst = 20
 
 pflip          = 0.2
 
