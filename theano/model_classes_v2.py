@@ -68,6 +68,8 @@ class BoltzmannMachine(object):
         
         self.num_samples    = 0
         
+        self.num_u_gibbs    = 0
+        
         self.gibbs_steps    = 0
         
         self.resample       = False
@@ -103,6 +105,10 @@ class BoltzmannMachine(object):
                if param == "num_samples":
                 
                   self.num_samples = algorithm_dict[param]
+                  
+               if param == "num_u_gibbs":
+                   
+                  self.num_u_gibbs = algorithm_dict[param]
                
                if param == "uniform_to_mf":
                    
@@ -120,7 +126,7 @@ class BoltzmannMachine(object):
                   #### alpha defines transition rate from
                   #### uniform to mean-field distribution
                   self.alpha = algorithm_dict[param]  
-       
+                  
         self.use_momentum   = use_momentum
         
         self.report_p_tilda = report_p_tilda
@@ -801,7 +807,7 @@ class BoltzmannMachine(object):
                                         
     def add_objective(self):
         
-        """ function to add model objective for model optimization """ 
+        """ function to add cost function for model optimization """ 
         
         if "CSS" in self.algorithm:
             
@@ -1822,41 +1828,53 @@ class BoltzmannMachine(object):
                                             
                   is_samples = np.vstack([is_samples, is_samples_new])
               
-           if self.num_samples > self.batch_size and (not self.resample):
-              num_u = 0 # a number of uniform IS samples 
-              num_s = self.num_samples - self.batch_size - num_u
+           if not self.resample:
+              
+              num_s = self.num_samples - self.batch_size - self.num_u_gibbs
+              
+              num_u = self.num_u_gibbs
+              
+              get_extra_samples = False
+              
+              if num_s < 0 and self.num_samples > self.batch_size:
+                 num_u = self.num_samples - self.batch_size
+                 p_new = 0.5*np.ones([num_u, self.num_vars]) 
+                 is_samples_new = self.np_rand_gen.binomial(n = 1,
+                                                            p = p_new,
+                                                            size =p_new.shape)
                  
-              if num_s > self.batch_size:
-                 num_tile = (num_s // self.batch_size)
-                 p_new = np.tile(p0,(num_tile, 1))
-                 num_u = num_u + (num_s- num_tile*self.batch_size)
+                 get_extra_samples = True
+              
+              if num_s >=0:
+                 stack_u = False  
+                 if num_s >= self.batch_size:
+                    num_tile = (num_s // self.batch_size)
+                    p_new = np.tile(p0,(num_tile, 1))
+                    add_to_num_u =  num_s- num_tile*self.batch_size
+                    stack_u = True
+                 else:
+                    add_to_num_u = num_s
                  
-              if num_u > 0:
-                 p_uniform = 0.5*np.ones([num_u, self.num_vars])
-                 p_new = np.vstack([p_new, p_uniform])
+                 num_u = num_u + add_to_num_u
                  
-              is_samples_new = self.np_rand_gen.binomial(n = 1,
-                                                         p = p_new,
-                                                         size =p_new.shape)
+                 if num_u > 0:
+                    p_uniform = 0.5*np.ones([num_u, self.num_vars])
+                    if stack_u:
+                       p_new = np.vstack([p_new, p_uniform])
+                    else:
+                       p_new = p_uniform
+                    
+                 is_samples_new = self.np_rand_gen.binomial(n = 1,
+                                                            p = p_new,
+                                                            size =p_new.shape)
                                                             
-              is_samples = np.vstack([is_samples, is_samples_new])
+                 get_extra_samples = True
                  
-              p          = np.vstack([p, p_new])
+              if get_extra_samples:                                              
+                 is_samples = np.vstack([is_samples, is_samples_new])
                  
-           # old implementation with uniform importance sampling
-           # all extra samples are obtained with uniform importance sampling
-           # a single local approximation is made for each minibatch point
-           #if self.num_samples > self.batch_size:
-              
-              #shape_out = (self.num_samples-self.batch_size, self.num_vars)
-              #extra_samples = self.np_rand_gen.binomial(n = 1,
-                                                       # p = 0.5,
-                                                       # size = shape_out)
-                                                     
-              #is_samples = np.vstack([is_samples, extra_samples])
-              
-              #p = np.vstack([p, 0.5*np.ones(shape_out)])
-              
+                 p          = np.vstack([p, p_new])
+                 
         return np.asarray(is_samples, dtype = theano.config.floatX), p
         
     def train_model(self, 

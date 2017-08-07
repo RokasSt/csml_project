@@ -25,9 +25,9 @@ import copy
 print("Importing data ...")
 all_images, all_labels = utils.get_data_arrays()
 
-all_train_images = all_images
+all_train_images = all_images[range(0,60000),:]
 
-all_train_labels = all_labels
+all_train_labels = all_labels[range(0,60000),:]
     
 def compare_algorithms(params ={'num_runs': 20,
                                 'N_train' : all_train_images.shape[0],
@@ -326,7 +326,7 @@ def compare_algorithms(params ={'num_runs': 20,
         else:
             
            ####### training uses all of the data
-           train_images = train_data_images
+           train_images = train_data_inputs
            
            ##### then reconstruct only a specified number
            if params['equal_per_classes']:
@@ -352,7 +352,7 @@ def compare_algorithms(params ={'num_runs': 20,
     
         which_noise_pixels = utils.get_noisy_pixels(pflip = params['pflip'], 
                                                 D = params['D'], 
-                                                N = params['num_to_learn'])
+                                                N = params['num_to_reconstruct'])
                                                
         noisy_images = np.copy(imgs_to_reconstruct)
 
@@ -360,7 +360,7 @@ def compare_algorithms(params ={'num_runs': 20,
         
         which_missing_pixels = utils.get_missing_pixels(gamma = params['pmiss'], 
                                                         D= params['D'], 
-                                                        N= params['num_to_learn'])
+                                                        N= params['num_to_reconstruct'])
                                                    
         blocked_images    = np.copy(imgs_to_reconstruct)
         blocked_images[which_missing_pixels]  = 0.5  # = -1
@@ -413,6 +413,7 @@ def compare_algorithms(params ={'num_runs': 20,
                                                      'bhid0':bhid0
                                                      },
                                   training_inputs = train_images,
+                                  images_to_reconst = imgs_to_reconstruct,
                                   reconst_arrays  = {'MISSING':reconst_missing,
                                                      'NOISY'  :reconst_noisy},
                                   missing_pixels  = which_missing_pixels,
@@ -465,6 +466,7 @@ def compare_algorithms(params ={'num_runs': 20,
                                                  'bhid0':bhid0
                                                  },
                               training_inputs = train_images,
+                              images_to_reconst = imgs_to_reconstruct,
                               reconst_arrays  = {'MISSING':reconst_missing,
                                                  'NOISY'  :reconst_noisy},
                               missing_pixels  = which_missing_pixels,
@@ -559,8 +561,9 @@ if __name__ == "__main__":
    exps ={'exp1':{'algorithm'     : 'CSS_GIBBS',
                   'algorithm_dict':
                           {#500, #[10, 50, 100],#[10, 50, 100, 300, 500],
-                           'num_samples'   : [10], # 40
-                           'resample'      : True,  
+                           'num_samples'   : [60,30], # 40
+                           'num_u_gibbs'   : 30,
+                           'resample'      : False,  
                            'alpha'         : None, #0.01, # 0.05;
                            'uniform_to_mf' : False,
                            'mixture'       : False,
@@ -609,34 +612,34 @@ if __name__ == "__main__":
    del exps['exp3']
    del exps['exp4']
    
-   params ={'num_runs': 40,
+   params ={'num_runs': 1,
             'N_train' : all_train_images.shape[0],
             'D': all_train_images.shape[1],
             'use_gpu': False,
-            'num_epochs': 10000, #15000,   #1500, 
+            'num_epochs': 100, #15000,   #1500, 
             'report_step':1,
             'save_every_epoch': False,
             'report_w_norm': True,
             'save_init_weights':True,
             'report_pseudo_cost':True,
-            'learning_rate': 0.1, #0.01,
-            'batch_size':10,
+            'learning_rate': 0.05, #0.1, #0.01,
+            'batch_size':30,
             'use_momentum':True,
-            'momentum' : 0.9,  #0.95,
+            'momentum' : 0.93,  #0.90, for multi-run experiments
             'num_hidden':0,
-            'num_to_learn':10,
+            'num_to_learn': 60000, #10, for multi-run experiments
             'equal_per_classes':True,
             'init_type':'ZEROS', # options: 'ZEROS', 'XAV, 'NORM'
             'zero_diag': False,
             'learn_biases': False,
             'num_reconst_iters' :10,
-            'num_to_reconstruct':10,
+            'num_to_reconstruct':20, # 10
             'pflip': 0.2,    #0.1,
             'pmiss': 0.9}    #0.5}
    
    compare_algorithms(params = params,
                       exps = exps,
-                      experiment_id = "GIBBS_RS1_NS10_NR40")
+                      experiment_id = "NS60_U30_BS30")
    
    
 

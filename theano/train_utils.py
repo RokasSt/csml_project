@@ -15,6 +15,7 @@ def run_experiment(glob_params,
                    method_params, 
                    init_params,
                    training_inputs,
+                   images_to_reconst,
                    reconst_arrays,
                    missing_pixels,
                    blocked_images,
@@ -87,10 +88,6 @@ def run_experiment(glob_params,
 
     save_plots_to = os.path.join(exp_path, filename+".jpeg")
     
-    images_to_reconst = np.copy(training_inputs)
-    
-    images_to_reconst[missing_pixels] =  1
-    
     reconst_images = \
     bm.reconstruct_missing(num_iters    = glob_params['num_reconst_iters'], 
                            recon_images = reconst_arrays['MISSING'], 
@@ -102,7 +99,7 @@ def run_experiment(glob_params,
                                   
     np.savetxt(os.path.join(exp_path, "RECONST_MISSING.dat"), reconst_images)
                                                                             
-    recon_errors = plot_reconstructions(training_inputs,
+    recon_errors = plot_reconstructions(images_to_reconst,
                                         blocked_images,
                                         reconst_images,
                                         save_plots_to)
@@ -119,7 +116,7 @@ def run_experiment(glob_params,
     
     reconst_images = \
     bm.reconstruct_noisy(num_iters = glob_params['num_reconst_iters'], 
-                         correct_images= training_inputs,
+                         correct_images= images_to_reconst,
                          recon_images  = reconst_arrays['NOISY'], 
                          noisy_images  = noisy_images,
                          pflip         = glob_params['pflip'])
@@ -130,7 +127,7 @@ def run_experiment(glob_params,
                                                     
        collect_reconst['NOISY'][method_params['algorithm']] = reconst_images
                                                 
-    recon_errors= plot_reconstructions(training_inputs,
+    recon_errors= plot_reconstructions(images_to_reconst,
                                        noisy_images,
                                        reconst_images,
                                        save_plots_to)
