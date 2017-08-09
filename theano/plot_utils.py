@@ -333,8 +333,13 @@ def plot_sequences(means_dict,
                               label =r"\textbf{%s %s}"
                               %(param_name,str(x_val)),
                               linewidth = 2)
+                              
+        if "_" in exp_tag:
+           title_str = exp_tag.replace("_"," ") 
+        else:
+          title_str = exp_tag
                                       
-        ax_obj.set_title(r'\textbf{%s}'%exp_tag, size = 15)
+        ax_obj.set_title(r'\textbf{%s}'%title_str, size = 15)
         
         ax_obj.set_xlabel(r'\textbf{%s}'%xlabel_dict[exp_tag], 
                           fontsize= 15)

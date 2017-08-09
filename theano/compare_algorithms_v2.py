@@ -561,8 +561,8 @@ if __name__ == "__main__":
    exps ={'exp1':{'algorithm'     : 'CSS_GIBBS',
                   'algorithm_dict':
                           {#500, #[10, 50, 100],#[10, 50, 100, 300, 500],
-                           'num_samples'   : [60,30], # 40
-                           'num_u_gibbs'   : 30,
+                           'num_samples'   : [250,125], # 40
+                           'num_u_gibbs'   : 125,
                            'resample'      : False,  
                            'alpha'         : None, #0.01, # 0.05;
                            'uniform_to_mf' : False,
@@ -616,14 +616,14 @@ if __name__ == "__main__":
             'N_train' : all_train_images.shape[0],
             'D': all_train_images.shape[1],
             'use_gpu': False,
-            'num_epochs': 100, #15000,   #1500, 
+            'num_epochs': 300, #15000,   #1500, 
             'report_step':1,
             'save_every_epoch': False,
             'report_w_norm': True,
             'save_init_weights':True,
             'report_pseudo_cost':True,
             'learning_rate': 0.05, #0.1, #0.01,
-            'batch_size':30,
+            'batch_size':125,
             'use_momentum':True,
             'momentum' : 0.93,  #0.90, for multi-run experiments
             'num_hidden':0,
@@ -639,7 +639,7 @@ if __name__ == "__main__":
    
    compare_algorithms(params = params,
                       exps = exps,
-                      experiment_id = "NS60_U30_BS30")
+                      experiment_id = "ALL_NS250_U125_BS125")
    
    
 

@@ -2092,11 +2092,18 @@ class BoltzmannMachine(object):
                 if report_p_tilda:
                    
                    if i % report_step == 0:
-               
                       print("p_tilda values for training examples:")
-                      print(p_tilda[0:self.batch_size])
+                      if self.batch_size >=20:
+                         print_inds = range(0,20)
+                         print(p_tilda[print_inds])
+                      else:
+                         print(p_tilda[0:self.batch_size])
                       print("sum of these values:")
-                      print(np.sum(p_tilda[0:self.batch_size]))
+                      if self.batch_size >= 20:
+                         print_inds = range(0,20)
+                         print(p_tilda[print_inds])
+                      else:
+                         print(np.sum(p_tilda[0:self.batch_size])) 
               
                       p_tilda_all[p_t_i,:] = p_tilda[0:self.batch_size]
               
