@@ -296,7 +296,7 @@ class BoltzmannMachine(object):
         
                  self.bhid = theano.shared(value= hbias_init, name='bhid', borrow=True)
                  
-              elif (bhid0 != None) and (self.num_hidden > 0):
+              elif (bhid0 is not None) and (self.num_hidden > 0):
                  print("bhid vector is initialized with provided vector") 
                  self.bhid = theano.shared(value= bhid0, name='bhid', borrow=True)
            
@@ -853,11 +853,8 @@ class BoltzmannMachine(object):
         if self.num_hidden > 0:
            
            if "PCD" in self.algorithm:
-              
               init_chain  = self.persistent_gibbs
-               
            else:
-            
               # positive phase
               _, _, hid_sample = self.get_h_given_v_samples(self.x)
 
@@ -924,7 +921,7 @@ class BoltzmannMachine(object):
                
                grad = grad - T.diag(T.diag(grad)) # no x i - xi connections
                # for all i = 1, ..., D
-            
+            ##############################################################
             if target_param.name =="b" and self.learn_biases == False:
                print("Will not learn bias terms")
                pass
@@ -2057,7 +2054,7 @@ class BoltzmannMachine(object):
                    if self.num_hidden ==0:
                         
                       if "PCD" in self.algorithm:
-                          
+                         
                          mf_sample, cd_sample = self.cd_sampling()
            
                          self.x_gibbs.set_value(np.transpose(cd_sample))

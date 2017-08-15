@@ -66,7 +66,7 @@ def get_missing_pixels(gamma, D, N):
     """ function to select which pixels are missing for 
     the reconstruction task """
     
-    select_pixels = np.random.rand(N,D) > (1-gamma)  # (0.5)
+    select_pixels = np.random.rand(N,D) > (1-gamma)
     
     return select_pixels
     

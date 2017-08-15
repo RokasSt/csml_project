@@ -447,13 +447,15 @@ def plot_end_values(means_dict,
               ax[plot_index].errorbar(x_axis, 
                                       y_axis, 
                                       yerr  = y_axis_std,
-                                      linewidth = 2)
+                                      linewidth = 2,
+                                      marker = "o")
               
            else:
             
               ax[plot_index].plot(x_axis, 
                                   y_axis,
-                                  linewidth = 2)
+                                  linewidth = 2,
+                                  marker = "o")
                                
                                
            ax[plot_index].set_title(r'\textbf{%s}'%exp_tag, fontsize = 15)  
@@ -484,11 +486,15 @@ def plot_end_values(means_dict,
               ax.errorbar(x_axis, 
                           y_axis, 
                           yerr  = y_axis_std,
-                          linewidth = 2)
+                          linewidth = 2,
+                          marker = "o")
               
            else:
             
-              ax.plot(x_axis, y_axis, linewidth =2)
+              ax.plot(x_axis, 
+                      y_axis, 
+                      linewidth =2,
+                      marker = "o")
                                
            ax.set_title(r'\textbf{%s}'%exp_tag, size = 15)  
         
@@ -1111,6 +1117,8 @@ def plot_temporal_data(list_target_dirs,
                split_reg_name = regressor.split("_")
                param_name = split_reg_name[0][0].upper()+\
                split_reg_name[1][0].upper()
+           else:
+              param_name = regressor
                
         else:
            print("Regressor is not specified")

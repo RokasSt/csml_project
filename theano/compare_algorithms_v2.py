@@ -206,7 +206,7 @@ def compare_algorithms(params ={'num_runs': 20,
     
        W0 = np.zeros([params['D'], params['D']])
        
-    if params['num_hidden']:
+    if params['num_hidden'] == 0:
        W0 = (W0 + np.transpose(W0))/2.0
                     
     W0 = np.asarray(W0, dtype = theano.config.floatX) 
@@ -350,17 +350,19 @@ def compare_algorithms(params ={'num_runs': 20,
            np.savetxt(os.path.join(run_path,"IMAGES_TO_RECONST.dat"),
                       imgs_to_reconstruct) 
     
-        which_noise_pixels = utils.get_noisy_pixels(pflip = params['pflip'], 
-                                                D = params['D'], 
-                                                N = params['num_to_reconstruct'])
+        which_noise_pixels =\
+        utils.get_noisy_pixels(pflip = params['pflip'], 
+                               D = params['D'], 
+                               N = params['num_to_reconstruct'])
                                                
         noisy_images = np.copy(imgs_to_reconstruct)
 
-        noisy_images[which_noise_pixels] = 1- noisy_images[which_noise_pixels]
+        noisy_images[which_noise_pixels] = 1-noisy_images[which_noise_pixels]
         
-        which_missing_pixels = utils.get_missing_pixels(gamma = params['pmiss'], 
-                                                        D= params['D'], 
-                                                        N= params['num_to_reconstruct'])
+        which_missing_pixels =\
+        utils.get_missing_pixels(gamma = params['pmiss'], 
+                                 D     = params['D'], 
+                                 N     = params['num_to_reconstruct'])
                                                    
         blocked_images    = np.copy(imgs_to_reconstruct)
         blocked_images[which_missing_pixels]  = 0.5  # = -1
@@ -586,10 +588,10 @@ if __name__ == "__main__":
                      },
                   'report_p_tilda': False,
                   'regressor': None},
-          'exp3':{'algorithm': 'PCD1',
+          'exp3':{'algorithm': 'PCD15',
                   'algorithm_dict':
                     {
-                        'gibbs_steps':1,
+                        'gibbs_steps':15,
                      },
                   'report_p_tilda': False,
                   'regressor':None},
@@ -608,38 +610,39 @@ if __name__ == "__main__":
                   'regressor': 'num_samples',
                   },            }
                        
-   #del exps['exp2'] #  uncomment for testing specific algorithm
-   del exps['exp3']
+   del exps['exp1'] 
+   del exps['exp2'] #  uncomment for testing specific algorithm
+   #del exps['exp3']
    del exps['exp4']
    
    params ={'num_runs': 1,
             'N_train' : all_train_images.shape[0],
             'D': all_train_images.shape[1],
             'use_gpu': False,
-            'num_epochs': 300, #15000,   #1500, 
+            'num_epochs': 100,  #300, #15000,   #1500, 
             'report_step':1,
             'save_every_epoch': False,
             'report_w_norm': True,
             'save_init_weights':True,
             'report_pseudo_cost':True,
-            'learning_rate': 0.05, #0.1, #0.01,
-            'batch_size':125,
+            'learning_rate': 0.1, # 0.05, #0.1, #0.01,
+            'batch_size': 20, #125,
             'use_momentum':True,
-            'momentum' : 0.93,  #0.90, for multi-run experiments
-            'num_hidden':0,
-            'num_to_learn': 60000, #10, for multi-run experiments
+            'momentum' : 0.90,
+            'num_hidden':500,
+            'num_to_learn': 60000, #10 a whole training set
             'equal_per_classes':True,
             'init_type':'ZEROS', # options: 'ZEROS', 'XAV, 'NORM'
             'zero_diag': False,
             'learn_biases': False,
             'num_reconst_iters' :10,
-            'num_to_reconstruct':20, # 10
+            'num_to_reconstruct': 20,  #10,  #20
             'pflip': 0.2,    #0.1,
             'pmiss': 0.9}    #0.5}
    
    compare_algorithms(params = params,
                       exps = exps,
-                      experiment_id = "ALL_NS250_U125_BS125")
+                      experiment_id = "ALL_H500")
    
    
 
