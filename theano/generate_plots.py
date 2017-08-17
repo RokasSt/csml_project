@@ -129,9 +129,9 @@ if __name__ == "__main__":
          target_dict["CSS_GIBBS"] = "W_NORMS.dat" 
          xlabel_dict["CSS_GIBBS"] = 'Iteration number'
          ylabel_dict["CSS_GIBBS"] = "L2-norm on W"
-         del target_dict["CSS"] 
-         del xlabel_dict["CSS"]
-         del ylabel_dict["CSS"]
+         #del target_dict["CSS"] 
+         #del xlabel_dict["CSS"]
+         #del ylabel_dict["CSS"]
          
       plot_utils.plot_temporal_data(list_target_dirs = all_target_dirs,
                                     target_dict = target_dict,

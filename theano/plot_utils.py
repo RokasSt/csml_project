@@ -408,6 +408,11 @@ def plot_end_values(means_dict,
         
         y_axis_std = []
         
+        if "_" in exp_tag:
+           title_str = exp_tag.replace("_"," ") 
+        else:
+           title_str = exp_tag
+        
         if not isinstance(means_dict[exp_tag], dict):
             
            x_axis = np.arange(1)
@@ -456,9 +461,8 @@ def plot_end_values(means_dict,
                                   y_axis,
                                   linewidth = 2,
                                   marker = "o")
-                               
-                               
-           ax[plot_index].set_title(r'\textbf{%s}'%exp_tag, fontsize = 15)  
+           
+           ax[plot_index].set_title(r'\textbf{%s}'%title_str, fontsize = 15)  
         
            ax[plot_index].set_xlabel(r'\textbf{%s}'%param_name, 
                                      fontsize =14)
@@ -496,7 +500,7 @@ def plot_end_values(means_dict,
                       linewidth =2,
                       marker = "o")
                                
-           ax.set_title(r'\textbf{%s}'%exp_tag, size = 15)  
+           ax.set_title(r'\textbf{%s}'%title_str, size = 15)  
         
            ax.set_xlabel(r'\textbf{%s}'%param_name, fontsize =14)
     

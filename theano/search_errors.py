@@ -23,6 +23,8 @@ arg_parser.add_argument('--regressor', type=str,required= False)
 
 arg_parser.add_argument('--compare_with', type=str,required= False)
 
+arg_parser.add_argument('--plot_mean_errors', type=str,required= False)
+
 FLAGS, _    = arg_parser.parse_known_args()
 
 target_dir  = FLAGS.target_dir
@@ -39,21 +41,38 @@ worst_runs        = {}
 
 check_max_errors  = {}
 
+frac_min_errors   = {}
+
 check_means_file  = os.path.join(target_dir, "MEAN_RECON_ERRORS.json")
 
 check_std_file    = os.path.join(target_dir, "STD_RECON_ERRORS.json")
 
-get_stats = False
+if FLAGS.plot_mean_errors != None:
+
+   plot_mean_errors = bool(plot_mean_errors)
+   
+else:
+    
+   plot_mean_errors  = False
 
 target_fields = []
 
-if not os.path.exists(check_means_file) or (not os.path.exists(check_std_file)):
+error_dict = {}
+
+path_to_json  = os.path.join(target_dir, "PARAMETERS.json")
     
-   get_stats   = True
-   error_dict = {}
+with open(path_to_json, 'r') as json_file:
+    
+     param_dict = json.load(json_file)
+        
+num_runs = param_dict['GLOBAL']['num_runs']
+
+run_indices = range(num_runs)
    
-for sub_f1 in os.listdir(target_dir):
-    
+for run_ind in run_indices:
+            
+    sub_f1 = "run%s"%run_ind
+            
     sub_dir = os.path.join(target_dir, sub_f1)
     
     if os.path.isdir(sub_dir): 
@@ -82,15 +101,18 @@ for sub_f1 in os.listdir(target_dir):
                       
                       if file_name == target_file_names[exp]:
                           
-                         if get_stats:
-                            if alg not in error_dict.keys():
-                               error_dict[alg] = {}
+                         if alg not in error_dict.keys():
+                            error_dict[alg] = {}
                          
                          if alg not in best_runs.keys():
                             
                             best_runs[alg] =    {}
                            
                             check_min_errors[alg] = {}
+                            
+                         if alg not in frac_min_errors.keys():
+                             
+                            frac_min_errors[alg] = {}
                             
                          if alg not in worst_runs.keys():
                             
@@ -104,46 +126,40 @@ for sub_f1 in os.listdir(target_dir):
                          
                          mean_error = np.mean(errors)
                          
-                         if get_stats:
-                            if exp not in error_dict[alg].keys():
-                               error_dict[alg][exp] = []
-                               error_dict[alg][exp].append(mean_error) 
+                         if exp not in error_dict[alg].keys():
+                            error_dict[alg][exp] = []
+                            error_dict[alg][exp].append(mean_error) 
                                 
-                            else:
-                               error_dict[alg][exp].append(mean_error)  
+                         else:
+                            error_dict[alg][exp].append(mean_error)  
                          
-                         if exp not in best_runs[alg].keys():
                             
-                            best_runs[alg][exp] = sub_f1 #run directory
+run_indices = np.array(run_indices)
                             
-                            check_min_errors[alg][exp] = mean_error
-                            
-                         else: 
-                             
-                            if mean_error < check_min_errors[alg][exp]:
-                                
-                               best_runs[alg][exp]    = sub_f1
-                               
-                               check_min_errors[alg][exp] = mean_error
-                               
-                         if exp not in worst_runs[alg].keys():
-                            
-                            worst_runs[alg][exp] = sub_f1 #run directory
-                            
-                            check_max_errors[alg][exp] = mean_error
-                            
-                         else: 
-                             
-                            if mean_error > check_max_errors[alg][exp]:
-                                
-                               worst_runs[alg][exp]    = sub_f1
-                               
-                               check_max_errors[alg][exp] = mean_error
-                                 
+for alg in error_dict.keys():
+    
+    for exp in error_dict[alg].keys():
+        
+        min_error = np.min(error_dict[alg][exp])
+        
+        max_error = np.max(error_dict[alg][exp])
+        
+        best_runs[alg][exp]  = list(run_indices[min_error == error_dict[alg][exp]])
+        
+        worst_runs[alg][exp] = list(run_indices[max_error == error_dict[alg][exp]])
+        
+        check_max_errors[alg][exp] = max_error
+        
+        check_min_errors[alg][exp] = min_error
+        
+        frac_min_errors[alg][exp]  = len(best_runs[alg][exp])/float(num_runs)
+                         
 print("Runs with the lowest reconstruction errors:")
 print(best_runs)
 print("Lowest mean errors:")
 print(check_min_errors)
+print("Fraction of runs with lowest reconstruction error:")
+print(frac_min_errors)
 print("Runs with the highest reconstruction errors:")
 print(worst_runs)
 print("Highest mean errors:")
@@ -151,7 +167,9 @@ print(check_max_errors)
 ########################################################################
 best_runs_path = os.path.join(target_dir,"BEST_RUNS.json")
 
-best_runs_err_path  = os.path.join(target_dir,"BEST_RUNS_ERRORS.json")
+best_runs_err_path = os.path.join(target_dir,"BEST_RUNS_ERRORS.json")
+
+frac_min_err_path  = os.path.join(target_dir, "RUN_FRACT_MIN_ERROR.json")
 
 with open(best_runs_path, 'w') as json_file:
     
@@ -160,6 +178,10 @@ with open(best_runs_path, 'w') as json_file:
 with open(best_runs_err_path, 'w') as json_file:
     
      json.dump(check_min_errors, json_file)
+     
+with open(frac_min_err_path, 'w') as json_file:
+    
+     json.dump(frac_min_err_path, json_file)
 #######################################################################     
 worst_runs_path = os.path.join(target_dir,"WORST_RUNS.json")
 
@@ -200,7 +222,7 @@ plot_utils.display_recon_errors(array_dict   = dict_of_lists,
                                 ylabel = "Maximum Reconstruction Error",
                                 plot_std     = False)
                               
-if get_stats:
+if plot_mean_errors:
     
    std_dict = {}
    
@@ -271,7 +293,7 @@ if FLAGS.compare_with != None:
     
    print("Results for %s"%target_dir)
    
-   if get_stats:
+   if plot_mean_errors:
       print("Means")
       print(error_dict)
       print("Standard deviation:")
