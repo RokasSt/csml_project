@@ -1151,8 +1151,8 @@ def plot_temporal_data(list_target_dirs,
                           if field in sub_item:
                              
                              found_regressor = False 
-                             if regressor in sub_item or \
-                             len(all_reg_values)==1:
+                             
+                             if regressor in sub_item:
                                 
                                 get_val = sub_item.split(regressor)[1]
                                 
@@ -1174,6 +1174,7 @@ def plot_temporal_data(list_target_dirs,
                                     
                                        found_regressor = True
                                        break
+                                       
                              if not found_regressor:
                                 for reg_val in all_reg_values:
                                     
