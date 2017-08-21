@@ -2,5 +2,5 @@
 *.pyc
 *.*~
 /*/logs_*
-/theano/CLASS*.dat
+/code/CLASS*.dat
 *.mat
