@@ -1,2 +1,2 @@
 # csml_project
-MSc CSML summer project: Using Likelihood Approximations to Train Energy-Based Models
+MSc CSML summer project: Complementary Sum Sampling for Learning in Boltzmann Machines
