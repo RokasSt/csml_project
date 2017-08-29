@@ -614,7 +614,25 @@ def plot_end_values(means_dict,
 def process_dict_to_list(target_dict):
     
     """ function to convert dictionary format to list format for
-    bar plotting"""
+    bar plotting.
+    
+    target_dict - dictionary in the following format:
+    
+                  target_dict[field name 0] = field value 0
+                  
+                  target_dict[field name 1] = field value 1
+                  
+                  .........................................
+                  
+                  target_dict[field_name n] = field value n
+                  
+    return:       output_dict in the following format:
+    
+                  output_dict['Y'] = [field value 0, field value 1, 
+                  field value 2, field value 3, ..., field value n]
+                  
+                  output_dict['LABELS'] = [field name 0, field name 1,
+                  field name 2, ..., field name n]. """
     
     output_dict = {}
     
@@ -636,7 +654,53 @@ def process_err_dict(means_dict,
                      update_dict = None, 
                      bar_plots = True):
     
-    """ function to process error dictionary into lists for plotting"""
+    """ function to process error dictionary into lists for plotting
+    
+    means_dict    - dictionary storing reconstruction errors.
+                    Two formats are allowed.
+                    
+                    Format 1
+                    mean_dict["algorithm_name"]["MISSING" or "NOISY" ] =
+                    value of mean error
+                 
+                    Format 2
+                    means_dict["algorithm_name"]["MISSING" or "NOISY"]
+                    ["regressor_name its_value"] = value of mean error
+                 
+    target_fields - list of names for target algorithms
+    
+    std_dict      - (default []) if specified, must store standard
+                    deviations of reconstruction errors and must take
+                    the same format as means_dict;
+                    
+    update_dict   - (default None) if bar_plots is True, update_dict
+                    must be a dictionary; if it is empty ({}) it is
+                    initialized using the following format:
+                    
+                    update_dict['NOISY'][algorithm name]['MEANS']   = []
+                    update_dict['NOISY'][algorithm name]['STD']     = []
+                    update_dict['MISSING'][algorithm name]['MEANS'] = []
+                    update_dict['MISSING'][algorithm name]['STD']   = []
+                    
+                    if update_dict is not empty, it must be specified
+                    in the format defined above, in order to iteratively
+                    append values to the stored lists.
+                    
+    bar_plots     - if set to True, means_dict (and, optionally, std_dict)
+                    is processed into output_dict (see code), but
+                    update_dict is not used. 
+                    If set to False, update_dict is updated with values
+                    from means_dict and std_dict.
+                    
+    return:         output_dict if bar_plots == True;
+    
+                    or 
+                    
+                    update_dict, regressor_values if bar_plots False;
+                    
+                    regressor_values is a list of regressor values extracted
+                    from the keys at the lowest level of means_dict;
+                    (see comments on means_dict).                     """
     
     if bar_plots == True:
     
