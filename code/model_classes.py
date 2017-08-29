@@ -4,6 +4,8 @@ MSc Project: Complementary Sum Sampling
 for Learning in Boltzmann Machines
 MSc Computational Statistics and 
 Machine Learning
+
+Boltzmann Machine class.
 """
 
 import theano
@@ -1305,7 +1307,12 @@ class BoltzmannMachine(object):
                    if os.path.isdir(sub_dir2):
                       
                       if "_" in sub_f2:
-                         algorithm = sub_f2.split("_")[0]
+                         spl_str   = sub_f2.split("_")
+                         if len(spl_str) > 3:
+                            algorithm = spl_str[0]+"_"+spl_str[1]
+                         else:
+                            algorithm = spl_str[0]
+                         
                       else:
                          algorithm = sub_f2
                          

@@ -4,6 +4,9 @@ MSc Project: Complementary Sum Sampling
 for Learning in Boltzmann Machines
 MSc Computational Statistics and 
 Machine Learning
+
+Script to run reconstruction tasks
+using trained Boltzmann Machines.
 """
 
 import numpy as np
@@ -23,9 +26,11 @@ import plot_utils
 import argparse
 import timeit
 import os
-from   model_classes_v2 import BoltzmannMachine
+from   model_classes import BoltzmannMachine
 
 np_rand_gen    = np.random.RandomState(1234)
+
+#### settings
 
 N_train        = 60000
 
@@ -37,9 +42,33 @@ pflip          = 0.2
 
 pmiss          = 0.9
 
-num_iters      = 10
+num_iters      = 20
+
+############
 
 assert num_to_reconst >= num_to_plot
+
+arg_parser     = argparse.ArgumentParser()
+
+arg_parser.add_argument('--target_dir', type=str,required= True)
+
+arg_parser.add_argument('--use_train_set', type=str,required= True)
+
+arg_parser.add_argument('--target_experiment', type=str,required= False)
+
+FLAGS, _       = arg_parser.parse_known_args()
+
+target_dir     = FLAGS.target_dir
+
+use_train_set  = bool(int(FLAGS.use_train_set))
+
+split_path     = os.path.split(target_dir)
+
+found_images   = False
+
+images_file    = "TRAIN_IMAGES.dat"
+
+params_file    = "PARAMETERS.json"
 
 print("Importing data ...")
 all_images, all_labels = utils.get_data_arrays()
@@ -56,28 +85,6 @@ D              = all_images.shape[1]
 
 assert D == 784
 
-arg_parser     = argparse.ArgumentParser()
-
-arg_parser.add_argument('--target_dir', type=str,required= True)
-
-arg_parser.add_argument('--use_train_set', type=str,required= True)
-
-arg_parser.add_argument('--algorithm', type=str,required= False)
-
-FLAGS, _       = arg_parser.parse_known_args()
-
-target_dir     = FLAGS.target_dir
-
-use_train_set  = bool(int(FLAGS.use_train_set))
-
-split_path     = os.path.split(target_dir)
-
-found_images   = False
-
-images_file    = "TRAIN_IMAGES.dat"
-
-params_file    = "PARAMETERS.json"
-
 if use_train_set:
    print("Will run reconstruction tasks on the training set")
    for item in os.listdir(target_dir):
@@ -91,9 +98,12 @@ if use_train_set:
        
    else:
        test_inputs = train_images
+       
+   mode_string = "TRAIN";
 else:
    print("Will run reconstruction tasks on the test set") 
    test_inputs    = test_images
+   mode_string    = "TEST";
 
 num_inputs        = test_inputs.shape[0]
 
@@ -105,13 +115,15 @@ check_params_file = os.path.join(root_root_path, params_file)
 
 if num_inputs > num_to_reconst:
    
-   inds_to_reconst = np.random.choice(num_inputs, 
+   inds_to_reconst = np.random.choice(range(num_inputs), 
                                       num_to_reconst, 
                                       replace = False)
                                    
 else:
     
-   inds_to_reconst  = np.array(range(num_to_reconst))
+   inds_to_reconst  = np.array(range(num_inputs))
+   
+   num_to_reconst   = num_inputs
    
 if num_to_reconst > num_to_plot:
    
@@ -124,7 +136,7 @@ else:
    inds_to_plot  = np.array(range(len(inds_to_reconst)))
    
 test_inputs = test_inputs[inds_to_reconst,:]
-                                   
+
 if "RH" in target_dir:
 
    ind0 = target_dir.find("RH")
@@ -146,9 +158,9 @@ bm = BoltzmannMachine(num_vars    = D,
                       num_hidden  = num_hidden,
                       training    = False)
                       
-if isinstance(FLAGS.algorithm, str):
+if isinstance(FLAGS.target_experiment, str):
     
-   path_to_params = os.path.join(target_dir, FLAGS.algorithm)
+   path_to_params = os.path.join(target_dir, FLAGS.target_experiment)
    
 else:
     
@@ -166,7 +178,7 @@ std_values  = {}
 
 curr_time = datetime.datetime.now().strftime("%I%M%p_%B%d_%Y" )
 
-filename = "RECONST_MISSING_%s"%curr_time
+filename = "RECONST_MISS_%s_%s"%(mode_string, curr_time)
 
 save_to_path = os.path.join(split_path[0],filename+".jpeg")
 
@@ -207,7 +219,7 @@ mean_values['MISSING'] = mean_val
 std_values['MISSING']  = std_val
 
 ############### reconstruction of noisy data
-filename = "RECONST_NOISY_%s"%curr_time
+filename = "RECONST_NOISY_%s_%s"%(mode_string, curr_time)
 
 save_to_path = os.path.join(target_dir,filename+".jpeg")
 

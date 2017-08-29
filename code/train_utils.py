@@ -4,6 +4,8 @@ MSc Project: Complementary Sum Sampling
 for Learning in Boltzmann Machines
 MSc Computational Statistics and 
 Machine Learning
+
+Training functions.
 """
 
 import numpy as np
@@ -36,7 +38,52 @@ def run_experiment(glob_params,
                    collect_w_norms = None,
                    collect_reconst = None):
                             
-    """ function to run a single training experiment """
+    """ function for running a single training experiment and testing 
+    trained Boltzmann Machine. 
+    
+    glob_params       - dictionary of global parameters
+    method_params     - dictionary of algorithm-specific parameters
+    init_params       - dictionary of inital values for parameters W and b
+                        init_params[W0], init_params[b0], init_params[bhid0] 
+    training_inputs   - N x D matrix of D-dimensional training inputs
+    
+    images_to_reconst - matrix of training inputs for which perform
+                        reconstruction tasks
+    reconst_arrays    - dictionary of matrices of corrupted images:
+                        reconst_arrays['MISSING'] and 
+                        reconst_arrays['NOISY'];
+                        each array must have the same dimensions as
+                        images_to_reconst.
+    missing_pixels    - matrix to indicate which pixels are missing;
+                        must have the same dimensions as images_to_reconst
+    blocked_images    - matrix of incomplete versions of training examples 
+                        provided in images_to_reconst. Used for 
+                        plotting. Must have the same dimensions as 
+                        images_to_reconst
+    noisy_images      - matrix of noisy versions of training examples
+                        provided in images_to_reconst. Must have the same 
+                        dimensions as images_to_reconst 
+    exp_path          - full path for saving data and reconstructions
+    
+    collect_w_norms   - (default None) optional dictionary to which the
+                        array of L2 norms on W matrix can be added;
+                        the key corresponding to the added array is the
+                        name of the training algorithm (e.g. CD1)
+    
+    collect_reconst   - (default None) dictionary of reconstructed images
+                        at the top level there must be two keys: 
+                        "MISSING" and "NOISY", corresponding to
+                        reconstruction tasks; then, each of these two
+                        entries is a dictionary over individual algorithms.
+                        
+    return:
+                        bm - instance of Boltzmann Machine
+                        collect_w_norms - (default None) 
+                        collect_reconst - (default None)
+                        reconstruction_errors - dictionary of reconstruction
+                        errors with keys ['MISSING', 'NOISY'], corresponding
+                        to the individual reconstruction tasks. 
+    """
             
     bm = BoltzmannMachine(num_vars       = glob_params['D'], 
                           num_hidden     = glob_params['num_hidden'],
@@ -144,7 +191,7 @@ def run_experiment(glob_params,
 ############################################################################
 def compare_algorithms(train_data_inputs,
                        train_data_labels,
-                       params ={'num_runs': 20,
+                       params ={'num_runs': 1,
                                 'N_train' : 60000,
                                 'D': 784,
                                 'use_gpu': False,
@@ -208,7 +255,31 @@ def compare_algorithms(train_data_inputs,
                        experiment_id = "DEFAULT",
                        np_rand_gen = np.random.RandomState(1234)):
     
-    """ master function to compare different algorithms """
+    """ main function to compare different algorithms.
+    
+    train_data_inputs - number_examples x D matrix of training inputs
+    
+    train_data_labels - number_examples x number_classes matrix of class
+                        labels for training images
+    
+    params            - dictionary of global training settings (see above)
+    
+    class_files       - list of file names for class-specific images
+    
+    exps              - dictionary of settings for individual training
+                        algorithms (see above)
+                        
+    experiment_id     - (default "DEFAULT") string to identify the path
+                        where training data and reconstruction results
+                        are saved, e.g.
+                        logs_CD1_CSS/experiment_id_current_date/run0/ ...
+                                                               /run1/ ...
+                                                               /run2/ ...
+                                                               ...
+                                                               ...
+    np_rand_gen       - instance of seeded numpy random generator .
+    
+    """
     
     assert params['D'] == 784
 

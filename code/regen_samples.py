@@ -43,9 +43,9 @@ for sub_folder in os.listdir(target_dir):
         
         only_subset = 0
         
-    command_string = "python test_bm.py "
+    command_string = "python sample_bm.py "
         
-    command_string+= " --num_samples 5"
+    command_string+= " --num_samples 10"
         
     command_string+= " --num_chains %d"%num_chains
         

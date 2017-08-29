@@ -12,8 +12,6 @@ import shutil
 import os
 import sys
 import json
-import tensorflow as tf
-from   tensorflow.examples.tutorials.mnist import input_data
 import theano
 import theano.tensor as T
 import datetime
@@ -23,32 +21,13 @@ import timeit
 import os
 from   model_classes import BoltzmannMachine
 
-
 np_rand_gen = np.random.RandomState(1234)
 
-num_is_samples = 10000
+num_is_samples = 100
 
-mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+N_train        = 60000
 
-test_images      = np.round(mnist.test.images)
-
-test_labels      = mnist.test.labels
-
-train_images     = np.round(mnist.train.images)
-
-train_labels     = mnist.train.labels
-
-num_train_images = train_images.shape[0]
-
-D                = train_images.shape[1]
-
-assert D == 784
-
-validate_images  = np.round(mnist.validation.images)
-
-validate_labels  = mnist.validation.labels
-
-arg_parser       = argparse.ArgumentParser()
+arg_parser     = argparse.ArgumentParser()
 
 arg_parser.add_argument('--path_to_params', type=str,required= True)
 
@@ -79,6 +58,23 @@ trained_subset    = int(FLAGS.trained_subset)
 num_steps         = int(FLAGS.num_steps)
 
 sampler           = FLAGS.sampler
+
+print("Importing data ...")
+all_images, all_labels = utils.get_data_arrays()
+
+test_images            = all_images[N_train:,:]
+
+test_labels            = all_labels[N_train:,:]
+
+train_images           = all_images[0:N_train,:]
+
+train_labels           = all_labels[0:N_train,:]
+
+num_train_images       = train_images.shape[0]
+
+D                      = train_images.shape[1]
+
+assert D == 784
 
 if (FLAGS.num_burn_in != None) and sampler =="GIBBS":
     

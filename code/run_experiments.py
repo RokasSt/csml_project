@@ -5,7 +5,7 @@ for Learning in Boltzmann Machines
 MSc Computational Statistics and 
 Machine Learning
 
-Script to run experiments using train_utils.py
+Script to run experiments using train_utils.py .
 """
 
 import numpy as np

@@ -4,6 +4,8 @@ MSc Project: Complementary Sum Sampling
 for Learning in Boltzmann Machines
 MSc Computational Statistics and 
 Machine Learning 
+
+Plotting functions.
 """
 
 import matplotlib
@@ -33,17 +35,29 @@ def make_raster_plots(images,
     
     """ function to generate a raster of image plots 
     
-    images - (num_samples x num_chains) x num_pixels  matrix with
-    num_samples x num_chains rows and num_pixels columns
+    images - N x num_pixels matrix of images; 
     
-    num_samples - number of required rows in the raster plot
+             if function argument init_with_images is set to True (default)
+             N must be equal to num_samples*num_chains + num_chains;
+             the first num_chains rows are interpreted as original test
+             images; then each consecutive block of num_chains images 
+             correspond to samples (e.g. gibbs-based reconstructions)
+             of individual test images;
+             if function argument init_with_images is set to False
+             N must be equal to num_samples*num_chains and function
+             assumes that original test images are not included in images
     
-    num_chains - number of required columns in the raster plot
+    num_samples - number of samples per chain/ test image or number of 
+                  rows in the raster plot containing sample images.
+    
+    num_chains - number of test images which corresponds to the number of
+                 columns in the raster plot
     
     reshape_to - shape of the image [x_dim, y_dim ] (e.g. [28, 28])
     
     save_to_path - full path to save images.
-    """
+    
+    init_with_images - (default True) . See comment on images. """
     
     num_rows =  num_samples
 
@@ -109,7 +123,20 @@ def plot_reconstructions(correct_images,
                          save_to_path):
                              
     """ function to plot test images, their corrupted versions and 
-    their reconstructions """
+    their reconstructions.
+    
+    correct_images - N x D matrix of correct versions of images
+                     (N - number of images, D- number of pixels)
+                     
+    corrupted_images - N x D matrix of corrupted versions of the images
+                       in correct_images
+                       
+    reconstructed_images - N x D matrix of recosntructed images
+    
+    save_to_path         - full path to save plots.
+    
+    return: 
+                        1 x N array of reconstruction errors.   """
     
     num_reconstruct = correct_images.shape[0]
     
@@ -177,7 +204,20 @@ def compare_reconstructions(correct_images,
                             save_to_path):
                              
     """ function to plot test images, their corrupted versions and 
-    their reconstructions under different training algorithms"""
+    their reconstructions under different training algorithms.
+    
+    correct_images - N x D matrix of correct versions of images
+                     (N - number of images, D- number of pixels)
+                     
+    corrupted_images - N x D matrix of corrupted versions of the images
+                       in correct_images
+                       
+    reconstructed_images - dictionary with K fields. A given entry
+                           stores N x D matrix of reconstructed images.
+                           Key of a given entry specifies the name
+                           of the algorithm used during model training.
+    
+    save_to_path         - full path to save plots. """
     
     num_reconstruct = correct_images.shape[0]
     
@@ -253,7 +293,38 @@ def plot_sequences(means_dict,
                    param_name ="", 
                    std_dict = None):
     
-    """function to plot temporal sequences"""
+    """function to plot temporal sequences stored in numpy arrays.
+    
+    means_dict - dictionary containing one dimensional value arrays;
+                 a given key is interpreted as the name of the
+                 algorithm; the corresponding dictionary value must be
+                 either one-dimensional numpy array (e.g. learning curve)
+                 or dictionary;
+                  
+                 if it is a dictionary, the individual entries of the 
+                 inner dictionary must store arrays obtained
+                 under different values of a given control parameter.
+                 Individual keys should correspond to the unique values
+                 of this parameter. Name of this parameter can be
+                 optionally specified by the function argument param_name;
+                 
+    xlabel_dict - dictionary of labels for x axis with keys corresponding
+                  to the names of training algorithms.
+                  
+    ylabel_dict - dictionary of labels for y axis with keys corresponding
+                  to the names of training algorithms.
+                  
+    save_to_path - full path to save plots to.
+    
+    param_name   - optional string specifier (default "") to label
+                   multiple curves in the algorithm-specific plot. 
+                   Used when means_dict contains inner dictionaries that
+                   store multiple curves (see above).
+                   
+    std_dict     - (default None) optional dictionary of standard
+                   deviations per individual entries in the arrays
+                   stored in means_dict; used to plot error bars.
+                   Must have the same structure as means_dict. """
     
     num_rows = len(means_dict.keys())
     
@@ -323,7 +394,7 @@ def plot_sequences(means_dict,
                                   means_dict[exp_tag][x_val],
                                   yerr= std_dict[exp_tag][x_val],
                                   label =r"\textbf{%s %s}"
-                                   %(param_name,str(x_val)),
+                                   %(param_name, str(x_val)),
                                   linewidth = 2)
                                    
                else:
@@ -331,7 +402,7 @@ def plot_sequences(means_dict,
                   ax_obj.plot(iters, 
                               means_dict[exp_tag][x_val],
                               label =r"\textbf{%s %s}"
-                              %(param_name,str(x_val)),
+                              %(param_name, str(x_val)),
                               linewidth = 2)
                               
         if "_" in exp_tag:
@@ -352,14 +423,7 @@ def plot_sequences(means_dict,
         ax_obj.yaxis.set_tick_params(labelsize = 14)
         
         ax_obj.xaxis.set_tick_params(labelsize = 14)
-        ## alternative to using locat_params:
-        #if min_val > 0:
-           #ax_obj.yaxis.set_ticks(np.arange(0, max_val, max_val/5))
-           #pass
-        #else:
-           #r = max_val-min_val 
-           #ax_obj.yaxis.set_ticks(np.arange(min_val, max_val, r/5))
-           
+        
         plot_index +=1
         
     if use_legend:
@@ -379,10 +443,35 @@ def plot_end_values(means_dict,
                     xlabel_dict,
                     ylabel_dict,
                     save_to_path, 
-                    param_name ="", 
+                    param_name, 
                     std_dict = None):
     
-    """plot last values from the learning curves"""
+    """plot last values of learning curves against the array of parameter 
+    values.
+    
+    means_dict - dictionary containing one dimensional value arrays;
+                 a given key is interpreted as the name of the
+                 algorithm; the corresponding dictionary value must be
+                 either a one-dimensional numpy array, storing the
+                 learning curve obtained by a given algorithm, or dictionary;
+                  
+                 if it is a dictionary, the individual entries of the 
+                 inner dictionary must store numpy arrays such that 
+                 each key corresponds to the unique value of the control 
+                 parameter and the associated dictionary value
+                 stores the corresponding learning curve.
+                 
+    ylabel_dict - dictionary of labels for y axis with keys corresponding
+                  to the names of training algorithms.
+                  
+    save_to_path - full path to save plots to.
+    
+    param_name   - string used to label x axis (control parameter name).
+                   
+    std_dict     - (default None) optional dictionary of standard
+                   deviations per individual entries in the arrays
+                   stored in means_dict; used to plot error bars.
+                   Must have the same structure as means_dict. """
     
     num_rows = len(ylabel_dict.keys())
     
@@ -864,6 +953,8 @@ def generate_scatter_plot(x_dict,
         
         for alg in x_dict[exp_type].keys():
             
+            print(alg)
+            
             x_values = np.array(x_dict[exp_type][alg])
             
             if exp_type in y_dict.keys():
@@ -876,9 +967,16 @@ def generate_scatter_plot(x_dict,
             
             assert len(x_values) == len(y_values)
             
+            if "_" in alg:
+               
+               alg_label = alg.replace("_"," "); 
+               
+            else:
+               alg_label = alg
+            
             ax_obj.scatter(x_values,
                            y_values,
-                           label = r"\textbf{%s}"%alg,
+                           label = r"\textbf{%s}"%alg_label,
                            marker = "o",
                            c = next(color_selector),
                            s = 25)

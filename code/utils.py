@@ -4,6 +4,8 @@ MSc Project: Complementary Sum Sampling
 for Learning in Boltzmann Machines
 MSc Computational Statistics and 
 Machine Learning 
+
+Helper functions for different purposes.
 """
 
 import numpy as np

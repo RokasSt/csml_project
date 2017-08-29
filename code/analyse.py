@@ -4,12 +4,14 @@ MSc Project: Complementary Sum Sampling
 for Learning in Boltzmann Machines
 MSc Computational Statistics and 
 Machine Learning
+
+Script to generate scatter plots of energy gaps.
 """
 import numpy as np
 import argparse
 import os
 import json
-from   model_classes_v2 import BoltzmannMachine
+from   model_classes import BoltzmannMachine
 import plot_utils
 
 #############################
