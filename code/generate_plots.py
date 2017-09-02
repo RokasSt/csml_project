@@ -148,13 +148,13 @@ if __name__ == "__main__":
                        
    if avg_recon_errors:
       print("Will generate plots of reconstruction errors")
-      list_experiments = ["CSS", "PCD1", "CD1"]
+      list_algorithms = ["CSS", "PCD1", "CD1"]
       if css_gibbs:
-         list_experiments.append("CSS_GIBBS")
-         del list_experiments[0]
+         list_algorithms.append("CSS_GIBBS")
+         del list_algorithms[0]
       
       plot_utils.plot_recon_errors(list_target_dirs = all_target_dirs,
-                                   list_experiments = list_experiments,
+                                   list_algorithms  = list_algorithms,
                                    param_dict_name  = "PARAMETERS.json",
                                    regressor        = regressor_name,
                                    algorithm_spec   = algorithm_specific,

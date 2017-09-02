@@ -138,20 +138,21 @@ def run_experiment(glob_params,
 
     save_plots_to = os.path.join(exp_path, filename+".jpeg")
     
-    reconst_images = \
     bm.reconstruct_missing(num_iters    = glob_params['num_reconst_iters'], 
                            recon_images = reconst_arrays['MISSING'], 
                            which_pixels = missing_pixels)
                               
     if collect_reconst != None:
             
-      collect_reconst['MISSING'][method_params['algorithm']] = reconst_images
+      collect_reconst['MISSING'][method_params['algorithm']] =\
+      reconst_arrays['MISSING']
                                   
-    np.savetxt(os.path.join(exp_path, "RECONST_MISSING.dat"), reconst_images)
+    np.savetxt(os.path.join(exp_path, "RECONST_MISSING.dat"), 
+               reconst_arrays['MISSING'])
                                                                             
     recon_errors = plot_reconstructions(images_to_reconst,
                                         blocked_images,
-                                        reconst_images,
+                                        reconst_arrays['MISSING'],
                                         save_plots_to)
                                          
     np.savetxt(os.path.join(exp_path,"%s_ERRORS.dat"%filename), recon_errors)
@@ -164,22 +165,23 @@ def run_experiment(glob_params,
 
     save_plots_to = os.path.join(exp_path, filename+".jpeg")
     
-    reconst_images = \
     bm.reconstruct_noisy(num_iters = glob_params['num_reconst_iters'], 
                          correct_images= images_to_reconst,
                          recon_images  = reconst_arrays['NOISY'], 
                          noisy_images  = noisy_images,
                          pflip         = glob_params['pflip'])
                                                  
-    np.savetxt(os.path.join(exp_path, "RECONST_NOISY.dat"), reconst_images)
+    np.savetxt(os.path.join(exp_path, "RECONST_NOISY.dat"), 
+               reconst_arrays['NOISY'])
     
     if collect_reconst != None:
                                                     
-       collect_reconst['NOISY'][method_params['algorithm']] = reconst_images
+       collect_reconst['NOISY'][method_params['algorithm']] =\
+       reconst_arrays['NOISY']
                                                 
     recon_errors= plot_reconstructions(images_to_reconst,
                                        noisy_images,
-                                       reconst_images,
+                                       reconst_arrays['NOISY'],
                                        save_plots_to)
                                          
     np.savetxt(os.path.join(exp_path, "%s_ERRORS.dat"%filename), recon_errors)

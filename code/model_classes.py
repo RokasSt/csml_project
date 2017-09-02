@@ -45,18 +45,54 @@ class BoltzmannMachine(object):
                  test_mode= False,
                  training = True):
         
-        """ Constructor for Fully Visible Boltzmann Machine
+        """ Constructor for Fully Visible Boltzmann Machine.
         
         num_vars - a number of visible nodes/variables
         
         num_hidden - a number of hidden variables; if greater than zero
         Restricted Boltzmann Machine is implemented.
         
-        training_inputs - N x D matrix of training inputs
+        training_inputs - (default None) N x D matrix of training inputs.
         
-        TODO
+        algorithm       - (default None) name of the algorithm.
         
-        """
+        algorithm_dict  - (default None) dictionary containing algorithm-
+                          specific parameters.
+        
+        batch_size      - (default None) size of the mini-batch per gradient
+                          update.
+        
+        use_momentum    - (default None) optional boolean indicator of
+                          whether to add momentum term.
+        
+        W0              - (default None) numpy array specifying the initial
+                          values for the connection weights; Boltzmann
+                          Machine must either be fully visible or RBM.
+        
+        b0              - (default None) numpy array specifying the initial
+                          values for the biases of the visible units.
+         
+        bhid0           - (default None) numpy array specifying the initial
+                          values for the biases of the hidden units.
+        
+        zero_diag       - (default True) boolean indicator of whether 
+                          set diagional elements of W to zero. 
+        
+        symmetric       - (default True) boolean indicator of whether
+                          weight matrix W is symmetric for fully visible
+                          BM.
+        
+        report_p_tilda  - (default False) boolean indicator of whether
+                          to report average value of p_tilda.
+        
+        learn_biases    - (default True) boolean indicator of whether
+                          learn bias terms (arrays b and bhid)
+        
+        test_mode       - (default False) boolean indicator of whether
+                          BM is initialized for test gradient computations.
+        
+        training        - (default True) boolean indicator of whether
+                          BM is initialized for model training.         """
         
         self.num_vars       = num_vars
         
@@ -367,7 +403,7 @@ class BoltzmannMachine(object):
     def set_mixture_means(self, inputs):
         
         """ function to set parameters of the mixture of Bernoulli products
-        with coefficient matrix"""
+        with coefficient matrix."""
         
         self.mix_means = []
               
@@ -406,21 +442,9 @@ class BoltzmannMachine(object):
                                             
     def energy_function(self, x):
     
-        """ to compute energy function for fully visible Boltzmann machine
-    
-        W - D x D matrix of weight variables in theano
-    
-        b - D-dimensional column vector of bias terms in theano
-    
-        x - D-dimensional input vector
-    
-        return:
-    
-        - xTWx - bT x 
-    
-        as a symbolic variable to add to the theano computational graph.
-    
-        """
+        """To compute energy function for a fully visible Boltzmann machine.
+        
+        energy function E(x) = - xT W x - bT x."""
   
         return -T.dot(T.transpose(x), T.dot(self.W, x)) -\
          T.dot(T.transpose(self.b), x)
@@ -444,7 +468,7 @@ class BoltzmannMachine(object):
     def get_v_given_h_samples(self, h):
         
         """ This function infers state of visible units given hidden units
-        Original implementation in http://deeplearning.net/tutorial/rbm.html"""
+        Original implementation in http://deeplearning.net/tutorial/rbm.html."""
         
         sig_input = T.dot(h, T.transpose(self.W)) + self.b
          
@@ -572,7 +596,7 @@ class BoltzmannMachine(object):
     def get_mixture_evals(self, x):
         
         """ function to add importance weights as mixtures of
-        Bernoulli products """
+        Bernoulli products. """
         
         q_xs_list, _ = theano.scan(lambda i: 
                                    self.get_importance_evals(x,
@@ -691,7 +715,7 @@ class BoltzmannMachine(object):
         
     def get_importance_evals(self, samples, params):
         
-        """ function to get evaluations of log importance distribution"""
+        """ function to get evaluations of log importance distribution."""
         
         evals = T.log(params)*samples + T.log(1.0 - params)*(1- samples)
         
@@ -701,7 +725,7 @@ class BoltzmannMachine(object):
         
     def get_mf_samples(self, data = True):
         
-        """ function to sample visible units from mean-field distribution"""
+        """ function to sample visible units from mean-field distribution."""
         
         if not data:
            
@@ -723,7 +747,7 @@ class BoltzmannMachine(object):
         
     def add_mf_updates(self):
         
-        """ function to add mean-field updates"""
+        """ function to add mean-field updates. """
         
         if self.num_hidden == 0:
         
@@ -746,7 +770,7 @@ class BoltzmannMachine(object):
     def do_mf_updates(self, num_steps, report = False):
         
         """ function to implement mean-field updates for approximation
-        of model (equilibrium) distribution"""
+        of model (equilibrium) distribution."""
         
         output_vars =[]
         
@@ -814,7 +838,7 @@ class BoltzmannMachine(object):
                                         
     def add_objective(self):
         
-        """ function to add cost function for model optimization """ 
+        """ function to add cost function for model optimization. """ 
         
         if "CSS" in self.algorithm:
             
@@ -850,7 +874,7 @@ class BoltzmannMachine(object):
         
     def add_cd_samples(self):
         
-        """ function to add sampling procedure for CD approximation """ 
+        """ function to add sampling procedure for CD approximation.""" 
         
         if self.num_hidden == 0:
         
@@ -893,7 +917,7 @@ class BoltzmannMachine(object):
     def get_cd_samples(self): 
         
         """ function to obtain samples for CD or PCD approxmation
-        for training fully visible Boltzmann Machine"""
+        for training fully visible Boltzmann Machine."""
         
         if "PCD" in self.algorithm:
             
@@ -919,7 +943,7 @@ class BoltzmannMachine(object):
                                          
     def add_grad_updates(self):
         
-        """ Compute and collect gradient updates to dictionary """
+        """ Compute and collect gradient updates to dictionary."""
         
         gradients = T.grad(self.cost, self.theta)
         
@@ -969,7 +993,7 @@ class BoltzmannMachine(object):
     def add_approximate_likelihoods(self):
         
         """ function to define approximate likelihoods (p_tilda) 
-        for progress tracking"""
+        for progress tracking."""
         
         p_tilda = T.exp(self.approx_Z)
         
@@ -1015,7 +1039,7 @@ class BoltzmannMachine(object):
     def optimization_step(self):
         
         """ function to define a theano function which implements
-        a single learning step"""
+        a single learning step."""
         
         if "CSS" in self.algorithm:
            
@@ -1074,7 +1098,7 @@ class BoltzmannMachine(object):
     def sigmoid_update_vis(self, x):
         
         """ function to compute the fixed point updates for the mean-field
-        parameters of visible units of Restricted Boltzmann Machine """
+        parameters of visible units of Restricted Boltzmann Machine."""
         
         sigmoid_activation = T.reshape(self.b,[self.num_vars,1]) + T.dot(self.W, x)
         
@@ -1083,7 +1107,7 @@ class BoltzmannMachine(object):
     def sigmoid_update_hid(self,x):
         
         """ function to compute the fixed point updates for the mean-field
-        parameters of hidden units of Restricted Boltzmann Machine """
+        parameters of hidden units of Restricted Boltzmann Machine."""
         
         sigmoid_activation = T.reshape(self.bhid, [self.num_hidden,1]) +\
         T.dot(T.transpose(self.W),x)
@@ -1093,8 +1117,7 @@ class BoltzmannMachine(object):
     def gibbs_update_node(self, target_node):
         
         """ Gibbs sampling update for a target node for fully
-        visible Boltzmann Machine
-        """
+        visible Boltzmann Machine. """
         
         p_xi_given_x_ = self.sigmoid_update(T.transpose(self.x_gibbs),target_node)
         
@@ -1131,7 +1154,7 @@ class BoltzmannMachine(object):
         
     def add_graph(self):
         
-        """ function to build a Theano computational graph """
+        """ function to build a Theano computational graph."""
         
         self.cd_sampling = None
         
@@ -1169,7 +1192,7 @@ class BoltzmannMachine(object):
         
     def test_pseudo_likelihood(self, test_inputs, num_steps):
         
-        """ function to test pseudo_likelihood with trained Boltzmann Machine"""
+        """ function to test pseudo_likelihood with trained Boltzmann Machine."""
         
         self.updates = OrderedDict()
         
@@ -1191,8 +1214,7 @@ class BoltzmannMachine(object):
         
     def get_algorithm_dict(self, param_dict, algorithm):
         
-        """ function to obtain settings' dictionary
-        for a given algorithm"""
+        """ function to obtain settings' dictionary for a given algorithm."""
         
         output_dict = None
         
@@ -1217,7 +1239,52 @@ class BoltzmannMachine(object):
     
         """ function to compare data-specific and approximating term
         of partition function of Boltzmann Machine trained with
-        different algorithms"""
+        different algorithms.
+        
+        target_dir - target directory cotaining training data.
+        
+        param_file - name of the file storing model parameters.
+        
+        w_norm_file - name of the file storing training sequence of
+                      L2-norms on the weight matrix W.
+                      
+        num_to_test - number of images to randomly select from given_inputs
+                      if "TRAIN_IMAGES.dat" file is not found in target_dir.
+                
+        get_means_from - dictionary whose keys are string tags for
+                         reconstruction tasks and the corresponding
+                         values are names of files containing values for
+                         mean reconstruction errors.
+                         
+        given_inputs   - (default []) optional numpy array from which
+                         test images are sampled (see num_to_test comment).
+                         
+                         
+        return:        E_gaps - dictionary whose each key is composed
+                       of the name of the specific algorithm and optional
+                       name of the regressor variable with its value; 
+                       the corresponding dictionary value is a list of
+                       differences between the data and complementary terms
+                       in log domain.
+
+                       recon_errors - dictionary storing lists of
+                       average (avg) reconstruction errors in the following 
+                       form:
+                       
+                       recon_errors["task_name"]["algorithm"] =\
+                       [avg error per run 0,
+                        avg error per run 1,
+                        avg error per run 2,
+                        ...................,
+                        avg error per run (num_runs-1)].
+                       
+                       p_tilda_data - dictionary with identical structure
+                       to E_gaps but storing lists of average p_tilda values.
+                       
+                       end_w_norms  - dictionary with identical structure
+                                      to E_gaps but storing lists of
+                                      the final L2 norms on the weight 
+                                      matrix W.                         """
         
         path_to_json  = os.path.join(target_dir, "PARAMETERS.json")
     
@@ -1393,7 +1460,7 @@ class BoltzmannMachine(object):
     def compare_css_terms(self, x_inputs, x_samples, full_path):
     
         """ function to obtain comparison between values of data term and
-        complementary term in the CSS approximation """
+        complementary term in the CSS approximation."""
         
         self.load_model_params(full_path)
                                 
@@ -1415,7 +1482,7 @@ class BoltzmannMachine(object):
     
         """ function to compute data term in CSS aproximation
         of partition function.
-        (for now assumes that resampling option is not available) """
+        (for now assumes that resampling option is not used). """
     
         if self.num_hidden == 0:
             
@@ -1431,7 +1498,7 @@ class BoltzmannMachine(object):
     
         """ function to compute a complementary (approximating) term
         in the CSS approximation of partition function.
-        (for now assumes that resampling option is not available)"""
+        (for now assumes that resampling option is not available)."""
     
         approx_Z = self.add_is_approximation()
     
@@ -1439,7 +1506,7 @@ class BoltzmannMachine(object):
                                       
     def test_p_tilda(self, test_inputs, random_inputs, training):
         
-        """ function to test p_tilda values with trained Boltzmann Machine"""
+        """ function to test p_tilda values with trained Boltzmann Machine."""
         
         self.batch_size      = test_inputs.shape[0]
         
@@ -1461,7 +1528,7 @@ class BoltzmannMachine(object):
     def relative_likelihood(self):
     
         """ function to compute relative, unnormalized likelihood 
-        of given examples"""
+        of given examples."""
         
         if self.num_hidden == 0:
         
@@ -1474,7 +1541,7 @@ class BoltzmannMachine(object):
     def test_relative_probability(self, inputs, trained= True):
         
         """ function to test relative, unnormalized likelihood 
-        of given examples"""
+        of given examples. """
         
         self.batch_size = inputs.shape[0]
         
@@ -1494,7 +1561,7 @@ class BoltzmannMachine(object):
         
     def add_p_tilda(self, training = True):
         
-        """ function to compute p_tilda for explicit gradient computations"""
+        """ function to compute p_tilda for explicit gradient computations."""
          
         if self.num_hidden == 0:
         
@@ -1529,7 +1596,7 @@ class BoltzmannMachine(object):
     def xn_xn_prod(self,x_n):
         
         """ function to add computation of x(n)^T x(n);
-        x_n - is 1 x D vector """
+        x_n - is 1 x D vector."""
         
         x_n_tiled =T.tile(x_n,(self.num_vars,1))
         
@@ -1538,7 +1605,7 @@ class BoltzmannMachine(object):
     def test_grad_computations(self, samples, training_points):
         
         """ function to test gradient computations explicitly
-        (implementation 2) """
+        (implementation 2)."""
         
         self.add_p_tilda(training = False)
         
@@ -1608,7 +1675,7 @@ class BoltzmannMachine(object):
     def log_noise_model(self, x, y, pflip):
         
         """ function to compute the log likelihood of the noise
-        model for the task of reconstructing noisy images """
+        model for the task of reconstructing noisy images."""
         
         return np.log(pflip)*np.sum(x != y) + np.log(1.0-pflip)*np.sum(x == y)
         
@@ -1619,7 +1686,20 @@ class BoltzmannMachine(object):
                           noisy_images,
                           pflip):
                                 
-        """ function to reconstruct images from noisy images """
+        """ function to reconstruct images from noisy images.
+        
+        num_iters      - number of times each affected pixel is perturbed
+                         per individual image (number of reconstruction
+                         iterations).
+                       
+        correct_images - N x D images whose rows contain original images.
+        
+        recon_images   - N x D matrix whose rows contain D-dimensional images
+                         which will be modified by the reconstruction procedure.
+        
+        noisy_images   - N x D matrix whose rows contain corrupted images.
+        
+        pflip          - probability of flipping a given pixel. """
         
         N = recon_images.shape[0]
     
@@ -1668,16 +1748,23 @@ class BoltzmannMachine(object):
                        recon_images[xi, d] = image_delta[d]
                         
                        Emax = E_delta
-                       
-        return recon_images
         
     def reconstruct_missing(self, 
                             num_iters, 
                             recon_images, 
-                            which_pixels,
-                            test_mode = False):
+                            which_pixels):
     
-        """ function to reconstruct images with missing pixels """
+        """ function to reconstruct images with missing pixels.
+        
+        num_iters    - number of times each affected pixel is perturbed
+                       per individual image (number of reconstruction
+                       iterations).
+        
+        recon_images - N x D matrix whose rows contain D-dimensional images
+                       which will be modified by the reconstruction procedure.
+        
+        which_pixels - N x D boolean matrix indicating which pixels are 
+                       affected.                                      """
     
         N = recon_images.shape[0]
     
@@ -1695,10 +1782,6 @@ class BoltzmannMachine(object):
             
             print("Reconstructing test image --- %d"%xi)
             
-            if test_mode:
-               num_checked =0
-               check_counter = int(0.5*np.sum(which_pixels[xi,:] == True))
-        
             for iter_ind in range(num_iters):
         
                 permuted_nodes = list(np.random.permutation(self.num_vars))
@@ -1719,18 +1802,12 @@ class BoltzmannMachine(object):
                           recon_images[xi, d] = 1
                        else:
                           recon_images[xi, d] = 0
-                          
-                       if test_mode:
-                          num_checked +=1
-                       if test_mode and num_checked <= check_counter:
-                          break
-        return recon_images
-    
+        
     def is_sampler(self, 
                    minibatch_set = [],
                    t = None):
         
-        """ function to obtain samples from importance distribution """
+        """ function to obtain samples from importance distribution."""
         
         if self.resample:
            shape_out = (self.num_samples*self.batch_size,self.num_vars)
@@ -1908,8 +1985,40 @@ class BoltzmannMachine(object):
                     exp_path,
                     test_gradients = False):
                     
-        """ function to carry out training of Botlzmann Machine"""
-    
+        """ function to carry out training of Botlzmann Machine.
+        
+        num_epochs - number of training epochs.
+        
+        learning_rate - learning rate for the gradient descent procedure.
+        
+        momentum      - momentum coefficient.
+        
+        num_iters     - number of training iterations per epoch.
+        
+        report_pseudo_cost - boolean indicator of whether report the 
+                             value of the pseudo-likelihood for progress
+                             tracking.
+                             
+        save_every_epoch   - save model parameters every epoch.
+        
+        report_step        - integer specifying a window of training iterations
+                             after which pseudo-likelihood measure and/or
+                             p_tilda values are printed to terminal. If
+                             report_step ==1, every training iteration
+                             is reported
+                             
+        report_p_tilda     - boolean indicator of whether report the value
+                             of p_tilda every report_step steps.
+                             
+        report_w_norm      - boolean indicator of whether report the value
+                             of the L2-norm on the weight matrix W.
+                             
+        exp_path           - full path for saving model parameters,
+                             training curves, etc.
+                             
+        test_gradients     - boolean indicator of whether to test gradient
+                             computations.                             """
+        
         if report_p_tilda:
         
            p_t_i = 0
@@ -2171,113 +2280,6 @@ class BoltzmannMachine(object):
         self.save_model_params(params_to)
     
         return p_tilda_all, pseudo_losses, training_time, w_norms
-        
-    def sample_from_mf_dist(self, 
-                            num_chains, 
-                            num_samples,
-                            num_steps,
-                            save_to_path,
-                            test_inputs    = None,
-                            save_mf_params = True):
-        
-        """ function to sample from mean-field approximation of trained
-        fully visible Boltzmann Machine."""
-        
-        self.num_samples = num_chains
-        
-        if type(test_inputs) is  np.ndarray:
-            
-           print("Will initialize MF parameters for visible units"+\
-           " with input images")
-           get_points = self.np_rand_gen.choice(test_inputs.shape[0], 
-                                                num_chains, 
-                                                False)
-           
-           init_mf_vis = test_inputs[get_points,:]
-           
-           init_with_images = True
-           
-           images = np.zeros([num_chains*num_samples+num_chains, self.num_vars])
-        
-           images[0:num_chains,:] = init_mf_vis
-           
-           init_mf_vis = np.transpose(init_mf_vis)
-            
-        else:
-            
-           images = np.zeros([num_chains*num_samples, self.num_vars])
-           
-           print("Will initialize MF parameters for visible units"+\
-            " with uniform distribution")
-           init_mf_vis = self.np_rand_gen.uniform(0, 
-                                                  1, 
-                                                  size =(self.num_vars, num_chains))
-                                                  
-           init_with_images = False
-              
-        init_mf_vis = np.asarray(init_mf_vis, 
-                                 dtype = theano.config.floatX)
-              
-        self.mf_vis_p = theano.shared(init_mf_vis, 
-                                      name= "mf_vis_p", 
-                                      borrow= True)
-        
-        if self.num_hidden > 0:
-           
-           print("Will initialize MF parameters for RBM hidden units"+\
-           " with uniform distribution")
-           
-           init_mf_hid = self.np_rand_gen.uniform(0,
-                                                  1, 
-                                                  size = (self.num_hidden, num_chains))
-              
-           init_mf_hid   = np.asarray(init_mf_hid, 
-                                      dtype = theano.config.floatX)
-              
-           self.mf_hid_p = theano.shared(init_mf_hid, 
-                                         name= "mf_hid_p", 
-                                         borrow= True)
-           
-        self.add_mf_updates()
-        
-        self.do_mf_updates(num_steps = num_steps, report = True)
-        
-        if save_mf_params:
-            
-           split_path   = os.path.split(save_to_path)
-           
-           mf_file = os.path.join(split_path[0], "MF_PARAMS.model")
-           
-           print("Saving MF parameters to %s"%mf_file)
-           
-           mf_file = file(mf_file, 'wb')
-           
-           cPickle.dump(self.mf_vis_p, 
-                        mf_file, 
-                        protocol=cPickle.HIGHEST_PROTOCOL)
-        
-           mf_file.close()
-        
-        mf_samples, sample_probs = self.get_mf_samples(data = True)
-        
-        get_samples = theano.function(inputs  = [],
-                                      outputs = [sample_probs, 
-                                                 mf_samples,
-                                                 self.mf_vis_p])
-                                      
-        print("Sampling...")
-        for ind in range(num_samples):
-            
-            p_out, samples_out, mf_vals = get_samples()
-            
-            images[num_chains*ind:num_chains*(ind+1),:] = samples_out
-
-        make_raster_plots(images, 
-                          num_samples, 
-                          num_chains, 
-                          reshape_to = [self.side, self.side], 
-                          save_to_path = save_to_path,
-                          init_with_images = init_with_images)    
     
     def sample_from_bm(self,
                        num_chains, 
@@ -2291,7 +2293,30 @@ class BoltzmannMachine(object):
         
         """ function to generate images from trained 
         Boltzmann Machine (fully visible).
-        """
+        
+        num_chains   - number of chains/number of test images
+                       for gibbs sampling
+        
+        num_samples  - number of samples per individual chain
+        
+        num_steps    - number of full Gibbs steps prior to obtaining
+                       the generated image for plotting
+        
+        save_to_path - full path to save plots of generated samples.
+        
+        num_burn_in  - number of burn-in Gibbs steps prior to collecting
+                       generated pixels. Used for a fully visible
+                       Boltzmann Machine only (num_hidden = 0).
+        
+        test_inputs  - (default None) optional array of inputs used to 
+                       initialize Markov chains.
+        
+        print_p_tilda- (default False) optional boolean indicator of whether
+                       display p_tilda values for test images (IS samples
+                       are obtained using uniform importance sampler).
+        
+        print_gibbs  - (default False) optional boolean indicator of whether
+                       display sigmoid outputs during Gibbs sampling.     """
         
         if type(test_inputs) is  np.ndarray:
             
@@ -2464,7 +2489,7 @@ class BoltzmannMachine(object):
                           
     def print_gibbs_conditionals(self, p_vals):
         
-        """ function to print values of gibbs conditionals """
+        """ function to print values of gibbs conditionals. """
         
         num_steps = len(p_vals);
         
@@ -2481,7 +2506,7 @@ class BoltzmannMachine(object):
                 
     def load_model_params(self, full_path):
         
-        """ function to load saved model parameters """
+        """ function to load saved model parameters. """
         
         print("Loading model parameters from %s"%full_path)
         with open (full_path, 'rb') as f:
@@ -2498,11 +2523,7 @@ class BoltzmannMachine(object):
         
     def save_model_params(self, full_path):
         
-        """ function to save model parameters (self.theta)
-        
-        file_to_save - file object for saving
-        
-         """
+        """ function to save model parameters."""
         
         file_to_save = file(full_path, 'wb')
         

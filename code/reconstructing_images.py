@@ -42,7 +42,7 @@ pflip          = 0.2
 
 pmiss          = 0.9
 
-num_iters      = 20
+num_iters      = 10
 
 ############
 
@@ -190,10 +190,10 @@ images_to_reconst = np.copy(test_inputs)
 blocked_images    = np.copy(test_inputs)
 images_to_reconst[which_pixels] =  1
 blocked_images[which_pixels]    =  0.5 #-1
-
-images_to_reconst = bm.reconstruct_missing(num_iters    = num_iters, 
-                                           recon_images = images_to_reconst, 
-                                           which_pixels = which_pixels)
+                                 
+bm.reconstruct_missing(num_iters    = num_iters, 
+                       recon_images = images_to_reconst, 
+                       which_pixels = which_pixels)
                                                                             
 plot_utils.plot_reconstructions(test_inputs[inds_to_plot,:],
                                 blocked_images[inds_to_plot,:],
@@ -233,12 +233,12 @@ noisy_images[which_pixels] = 1- noisy_images[which_pixels]
 
 images_to_reconst= np.copy(noisy_images)
 
-images_to_reconst = bm.reconstruct_noisy(num_iters      = num_iters, 
-                                         correct_images = test_inputs,
-                                         recon_images   = images_to_reconst, 
-                                         noisy_images   = noisy_images,
-                                         pflip          = pflip)
-                                                
+bm.reconstruct_noisy(num_iters      = num_iters, 
+                     correct_images = test_inputs,
+                     recon_images   = images_to_reconst, 
+                     noisy_images   = noisy_images,
+                     pflip          = pflip)                                       
+
 plot_utils.plot_reconstructions(test_inputs[inds_to_plot,:],
                                 noisy_images[inds_to_plot,:],
                                 images_to_reconst[inds_to_plot,:],

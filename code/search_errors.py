@@ -4,6 +4,7 @@ MSc Project: Complementary Sum Sampling
 for Learning in Boltzmann Machines
 MSc Computational Statistics and 
 Machine Learning
+
 Script to search for reconstruction errors
 """
 

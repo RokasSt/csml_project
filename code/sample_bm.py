@@ -4,6 +4,8 @@ MSc Project: Likelihood Approximations
 for Energy-Based Models
 MSc Computational Statistics and 
 Machine Learning
+
+Script to generate samples from trained Boltzmann Machines.
 """
 
 import numpy as np
@@ -39,8 +41,6 @@ arg_parser.add_argument('--trained_subset', type = str, required = True)
 
 arg_parser.add_argument('--num_steps', type = str, required = True)
 
-arg_parser.add_argument('--sampler', type = str, required = True)
-
 arg_parser.add_argument('--init_with_dataset', type = str, required = True)
 
 arg_parser.add_argument('--num_burn_in', type = str, required = False)
@@ -56,8 +56,6 @@ num_chains        = int(FLAGS.num_chains)
 trained_subset    = int(FLAGS.trained_subset)
 
 num_steps         = int(FLAGS.num_steps)
-
-sampler           = FLAGS.sampler
 
 print("Importing data ...")
 all_images, all_labels = utils.get_data_arrays()
@@ -76,14 +74,10 @@ D                      = train_images.shape[1]
 
 assert D == 784
 
-if (FLAGS.num_burn_in != None) and sampler =="GIBBS":
-    
+if (FLAGS.num_burn_in != None):
    num_burn_in = int(FLAGS.num_burn_in)
-   
 else:
-    
    num_burn_in = 0
-   
    
 if "RH" in path_to_params:
 
@@ -101,25 +95,42 @@ split_path        = os.path.split(path_to_params)
 
 if bool(trained_subset):
     
-   indices =np.loadtxt(os.path.join(split_path[0],"LEARNT_INSTANCES.dat"))
+   path_to_indices = os.path.join(split_path[0],"LEARNT_INSTANCES.dat")
+    
+   if os.path.exists(path_to_indices): 
+    
+      indices =np.loadtxt(os.path.join(split_path[0],"LEARNT_INSTANCES.dat"))
    
-   indices = np.array(indices, dtype = np.int64)
+      indices = np.array(indices, dtype = np.int64)
    
-   test_inputs = train_images[indices,:]
-   
-   if indices.size == 1 and (num_chains != 1):
+      test_inputs = train_images[indices,:]
+      
+      indices_size = indices.size
+      
+   else:
+       
+      print("LEARNT_INSTANCES.dat was not found in %s"%split_path[0])
+      split_path1 = os.path.split(split_path[0])
+      
+      path_to_train_imgs = os.path.join(split_path1[0], "TRAIN_IMAGES.dat")
+      
+      test_inputs = np.loadtxt(path_to_train_imgs)
+      
+      indices_size= test_inputs.shape[0]
+      
+   if indices_size == 1 and (num_chains != 1):
        
       use_num_chains = 1
       
       test_inputs = np.reshape(test_inputs,[1,len(test_inputs)])
       
-   elif indices.size ==1 and (num_chains ==1):
+   elif indices_size ==1 and (num_chains ==1):
        
       use_num_chains = 1
       
       test_inputs = np.reshape(test_inputs,[1,len(test_inputs)])
       
-   elif indices.size != 1 and (num_chains ==1):
+   elif indices_size != 1 and (num_chains ==1):
        
       select_inds = np.random.choice(len(indices), 
                                      num_chains, 
@@ -131,15 +142,13 @@ if bool(trained_subset):
        
    else:
        
-      len_inds = len(indices)
-   
-      if num_chains <= len_inds:
+      if num_chains <= indices_size:
          
          use_num_chains = num_chains 
           
       else:
          
-         use_num_chains  = len(indices)
+         use_num_chains  = indices_size
          
    x_to_test_p = test_inputs
    
@@ -153,15 +162,12 @@ else:
 
    x_to_test_p = test_inputs[x_inds, :]
    
-filename = "SS%dCH%dST%d"%(num_samples, num_chains, num_steps)
+filename = "SS%dCH%dST%dNB%d"%(num_samples, 
+                               num_chains, 
+                               num_steps,
+                               num_burn_in)
 
-if sampler == "MF":
-    
-   filename+="_MF"
-   
-elif sampler == "GIBBS":
-    
-   filename+="_GIBBS"
+filename+="_GIBBS"
    
 if "END" in path_to_params:
    
@@ -230,38 +236,18 @@ if not init_with_dataset:
     
    test_inputs = None
 #################### 
- 
-if sampler == "MF":
-    
-   start_time = timeit.default_timer()
+start_time = timeit.default_timer()
 
-   bm.sample_from_mf_dist(num_chains   = use_num_chains, 
-                          num_samples  = num_samples,
-                          num_steps    = num_steps,
-                          save_to_path = save_to_path,
-                          test_inputs  = test_inputs,
-                          save_mf_params = True)
-                          
-   
-   end_time = timeit.default_timer()
-                   
-   print('Image generation took %f minutes'%((end_time - start_time)/60.)) 
-    
-elif sampler == "GIBBS":
-    
-   start_time = timeit.default_timer()
-
-   bm.sample_from_bm(num_chains   = use_num_chains, 
-                     num_samples  = num_samples,
-                     num_steps    = num_steps,
-                     save_to_path = save_to_path,
-                     num_burn_in  = num_burn_in,
-                     test_inputs  = test_inputs)
+bm.sample_from_bm(num_chains   = use_num_chains, 
+                  num_samples  = num_samples,
+                  num_steps    = num_steps,
+                  save_to_path = save_to_path,
+                  num_burn_in  = num_burn_in,
+                  test_inputs  = test_inputs)
          
-                    
-   end_time = timeit.default_timer()
+end_time = timeit.default_timer()
                    
-   print('Image generation took %f minutes'%((end_time - start_time)/60.))
+print('Image generation took %f minutes'%((end_time - start_time)/60.))
 
 
                    

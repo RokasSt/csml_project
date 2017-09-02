@@ -299,14 +299,14 @@ def plot_sequences(means_dict,
                  a given key is interpreted as the name of the
                  algorithm; the corresponding dictionary value must be
                  either one-dimensional numpy array (e.g. learning curve)
-                 or dictionary;
+                 or dictionary.
                   
                  if it is a dictionary, the individual entries of the 
                  inner dictionary must store arrays obtained
                  under different values of a given control parameter.
                  Individual keys should correspond to the unique values
                  of this parameter. Name of this parameter can be
-                 optionally specified by the function argument param_name;
+                 optionally specified by the function argument param_name.
                  
     xlabel_dict - dictionary of labels for x axis with keys corresponding
                   to the names of training algorithms.
@@ -324,7 +324,7 @@ def plot_sequences(means_dict,
     std_dict     - (default None) optional dictionary of standard
                    deviations per individual entries in the arrays
                    stored in means_dict; used to plot error bars.
-                   Must have the same structure as means_dict. """
+                   Must have the same structure as means_dict.        """
     
     num_rows = len(means_dict.keys())
     
@@ -624,7 +624,7 @@ def process_dict_to_list(target_dict):
                   
                   .........................................
                   
-                  target_dict[field_name n] = field value n
+                  target_dict[field_name n] = field value n.
                   
     return:       output_dict in the following format:
     
@@ -665,13 +665,13 @@ def process_err_dict(means_dict,
                  
                     Format 2
                     means_dict["algorithm_name"]["MISSING" or "NOISY"]
-                    ["regressor_name its_value"] = value of mean error
+                    ["regressor_name its_value"] = value of mean error .
                  
-    target_fields - list of names for target algorithms
+    target_fields - list of names for target algorithms.
     
     std_dict      - (default []) if specified, must store standard
                     deviations of reconstruction errors and must take
-                    the same format as means_dict;
+                    the same format as means_dict.
                     
     update_dict   - (default None) if bar_plots is True, update_dict
                     must be a dictionary; if it is empty ({}) it is
@@ -866,7 +866,21 @@ def generate_bar_plot(y_list,
                       title = None,
                       std_list = []):
     
-    """ function to generate bar plots for a given array"""    
+    """ function to generate bar plots for a given array.
+    
+    y_list       - list of y values.
+    
+    labels       - list of labels on x-axis to mark individual bars.
+    
+    save_to_path - full path to save bar plot.
+    
+    ylabel       - label for y axis.
+    
+    title        - (default None) optional title for bar plot.
+    
+    std_list     - (default []) optional list of values specifying size
+                   of error bars.                                    """ 
+                      
     fig, ax = plt.subplots(1, 1, sharex=False)
     
     width = 0.7
@@ -921,7 +935,30 @@ def display_recon_errors(array_dict,
                          ylabel = 'Mean Reconstruction Errors',
                          plot_std = True):
     
-    """ function to generate bar plots of reconstruction errors"""    
+    """ function to generate bar plots of reconstruction errors.
+    
+    array_dict - dictionary containing values for mean reconstruction 
+                 errors in the following form:
+                 array_dict["LABELS"] = list of labels for x axis for
+                 each subplot
+                 array_dict["task_name"]["MEANS"] = list of mean values
+                 array_dict["task_name"]["STD"] (optional entry) 
+                 = list of std  values
+                 
+                 at the moment function only works with two different
+                 tasks, generating two different subplots.
+                 
+    num_exps   - number of experiments (bars) per task; should be the
+                 same for both tasks.
+                 
+    save_to_path - full path to save generated plot.
+    
+    ylabel       - label for y axis.
+    
+    plot_std     - (default True) boolean indicator for whether to plot
+                   error bars; if True, array_dict["task_name"] must 
+                   contain "STD" field for each task_name.           """
+                       
     fig, ax = plt.subplots(1, 2, sharex=False)
 
     ax = ax.ravel()
@@ -992,7 +1029,27 @@ def generate_scatter_plot(x_dict,
                           title_dict,
                           save_to_path):
                               
-    """ function to generate scatter plot over given arrays"""
+    """ function to generate scatter plot for given arrays.
+    
+    x_dict - dictionary containing list of x values; each entry of
+             x_dict stores a dictionary over x-value lists which are
+             used to generate an individual subplot; number of fields
+             in x_dict is a number of subplots in the final figure;
+             entries of inner dictionary per x_dict entry correspond
+             to different populations of x-values per x_dict entry-specific 
+             scatter subplot.
+             
+    y_dict - identical to x_dict but for y axis (must have the same
+             dictionary keys as x_dict).
+             
+    x_label- label for x axis on every subplot.
+    
+    y_label- label for y axis on every subplot.
+    
+    title_dict - dictionary containing tiltes for individual subplots;
+                 keys must identical to the keys of x_dict.
+                 
+    save_to_path - full path to save figure.                         """
     
     num_cols = len(x_dict.keys())
     
@@ -1076,7 +1133,29 @@ def plot_regressions(y_dict,
                      save_to_path,
                      plot_std = False):
                          
-    """ function to generate regression plots """
+    """ function to generate regression plots. 
+    
+    y_dict - dictionary containing lists of y values; each entry of
+             y_dict stores a dictionary over y-value lists which are
+             used to generate an individual subplot; number of fields
+             in y_dict is a number of subplots in the final figure;
+             entries of inner dictionary per y_dict entry correspond
+             to different populations of y values per y_dict entry-specific 
+             subplot; both means and standard deviations can be specified:
+             y_dict["task_name"]["algorithm_name"]["MEANS"] = list of y values
+             (optional) y_dict["task_name"]["algorithm_name"]["STD"] =
+             list of values for error bars.
+    
+    x_values     -  a single list of x values associated with each y list. 
+    
+    x_label      -  label for x-axis on each subplot.
+    
+    y_label      -  label for y-axis on each subplot.
+    
+    save_to_path -  full path to save figure.
+    
+    plot_std     -  (default False) boolean indicator whether to add error
+                    bars using "STD" values in y_dict.                """
     
     num_exps = len(y_dict.keys())
     
@@ -1161,10 +1240,7 @@ def plot_regressions(y_dict,
         
         ax[plot_index].set_xlim([x_values[0] -0.2*x_values[0], 
                                  x_values[-1]+0.05*x_values[-1]])
-                                 
-        #ax[plot_index].xaxis.set_ticks(np.arange(x_values[0], x_values[-1]+15, 
-                                      #(x_values[-1])/5) )
-                                      
+        
         x_list = list(np.arange(x_values[0], x_values[-1], (x_values[-1])/10))  
         
         x_list.append(x_values[-1])
@@ -1188,7 +1264,27 @@ def add_data(target_path,
              avg_axis = None):
                    
     """ function to extract temporal sequences of measurements from the 
-    target file for plotting purposes"""
+    numpy array for plotting purposes.
+    
+    target_path  - full path to stored numpy array.
+    
+    look_at_dict - dictionary which is updated with the
+                   value array stored in the target_path.
+                   
+    target_field and 
+    param_value  - target_field and param_value are keys to access the
+                   array in look_at_dict which is extended (using numpy
+                   vstack function) with the array loaded from target_path;
+                   specifically,
+                   look_at_dict[target_field][param_value] = current array
+                   or, if param_value == None,
+                   look_at_dict[target_field] = current array;
+                   if target_field and param_value are not found in 
+                   look_at_dict, these are initialized using the array
+                   loaded form target_path.
+                   
+    avg_axis     - (default None) axis along which values in the loaded
+                   numpy array are averaged if it is two-dimensional.  """
 
     if os.path.exists(target_path):
                       
@@ -1236,7 +1332,6 @@ def add_data(target_path,
            
              look_at_dict[target_field] = X
           
-    return look_at_dict
 ##############################################################################  
 def plot_temporal_data(list_target_dirs,
                        target_dict,
@@ -1250,7 +1345,46 @@ def plot_temporal_data(list_target_dirs,
                        end_values_dict = None,
                        error_bars = False):
     
-    """ function to plot temporal data"""
+    """ function to plot temporal data.
+    
+    list_target_dirs  - list of full paths to individual training experiments.
+    
+    target_dict       - dictionary whose keys are names of the algorithms
+                        and stored values are names of target files from
+                        which temporal data must be extracted.
+    
+    xlabel_dict       - dictionary whose keys are the names of the algorithms
+                        and the corresponding values are x-axis labels for
+                        algorithm-specific plots.
+    
+    ylabel_dict       - dictionary whose keys are the names of the algorithms
+                        and the corresponding values are y-axis labels for
+                        algorithm-specific plots.
+    
+    file_name         - string identifier for naming figures generated
+                        by this function.
+    
+    param_dict_name   - name of json file which stores dictionary of
+                        global and algorithms-specific parameters.
+    
+    regressor         - (default None) name of regressor variable 
+                        (e.g. "num_samples").
+    
+    algorithm_specific- (default None) optional boolean indicator of whether
+                        a given regressor is specific to one of the algorithms.
+    
+    average_over_axis - (default None) axis along which values 
+                        are averaged if numpy arrays loaded 
+                        from target files are two-dimensional. 
+    
+    end_value_dict    - (default None) optional dictionary whose keys are 
+                        the names of the algorithms
+                        and the corresponding values are y-axis labels for
+                        the plots of the last values of temporal data
+                        arrays.
+    
+    error_bars        - (default False) boolean indicator of whether to
+                        to plot data with error bars. """
     
     all_records = {}
     
@@ -1326,8 +1460,7 @@ def plot_temporal_data(list_target_dirs,
                                        check_file =\
                                        os.path.join(check_path, 
                                                  target_dict[field])
-                                                 
-                                       all_records = \
+                                       
                                        add_data(target_path = check_file, 
                                                 look_at_dict= all_records,
                                                 target_field = field,
@@ -1343,8 +1476,7 @@ def plot_temporal_data(list_target_dirs,
                                     check_file =\
                                     os.path.join(check_path, 
                                                  target_dict[field])
-                                                 
-                                    all_records = \
+                                    
                                     add_data(target_path = check_file, 
                                              look_at_dict= all_records,
                                              target_field = field,
@@ -1474,13 +1606,29 @@ def plot_temporal_data(list_target_dirs,
                           std_dict     = all_records_std)
 ########################################################################
 def plot_recon_errors(list_target_dirs,
-                      list_experiments,
+                      list_algorithms,
                       param_dict_name,
                       regressor= None,
                       algorithm_spec = None,
                       error_bars = False):
     
-    """ function to generate plots of reconstruction errors """
+    """ function to generate plots of reconstruction errors.
+    
+    list_target_dirs  - list of full paths to individual training experiments.
+    
+    list_algorithms   - list of target algorithms (e.g. ["CSS", "PCD1", "CD1"]).
+                       
+    param_dict_name   - name of json file that stores the parameter dictionary.
+                       
+    regressor         - (default None) name of regressor variable 
+                        (e.g. "num_samples").
+    
+    algorithm_specific- (default None) optional boolean indicator of whether
+                        a given regressor is specific to one of the 
+                        algorithms. 
+    
+    error_bars        - (default False) boolean indicator of whether to
+                        to plot data with error bars.                   """
     
     num_runs = 0
     
@@ -1533,7 +1681,7 @@ def plot_recon_errors(list_target_dirs,
         if regressor == None:
             
            dict_of_lists = process_err_dict(means_dict,
-                                            list_experiments,
+                                            list_algorithms,
                                             std_dict,
                                             bar_plots = True)
             
@@ -1550,7 +1698,7 @@ def plot_recon_errors(list_target_dirs,
             
            dict_to_update, found_reg_list =\
            process_err_dict(means_dict,
-                            list_experiments,
+                            list_algorithms,
                             std_dict,
                             dict_to_update,
                             bar_plots = False)
